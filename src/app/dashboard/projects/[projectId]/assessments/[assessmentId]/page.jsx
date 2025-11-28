@@ -2,6 +2,9 @@ import { getAssessment, startAssessmentAttempt } from '@/actions';
 import { AssessmentClient } from './AssessmentClient';
 import { notFound } from 'next/navigation';
 
+// Force dynamic rendering since we use headers() in auth
+export const dynamic = 'force-dynamic';
+
 /**
  * Assessment Page (Server Component)
  */

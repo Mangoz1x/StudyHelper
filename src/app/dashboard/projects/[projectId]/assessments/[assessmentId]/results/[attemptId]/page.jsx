@@ -2,6 +2,9 @@ import { getAttemptResults } from '@/actions';
 import { ResultsClient } from './ResultsClient';
 import { notFound } from 'next/navigation';
 
+// Force dynamic rendering since we use headers() in auth
+export const dynamic = 'force-dynamic';
+
 /**
  * Assessment Results Page (Server Component)
  */

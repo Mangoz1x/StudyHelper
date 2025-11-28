@@ -1,6 +1,9 @@
 import { getProjects } from '@/actions';
 import { ProjectsPageClient } from './ProjectsPageClient';
 
+// Force dynamic rendering since we use headers() in auth
+export const dynamic = 'force-dynamic';
+
 /**
  * Projects List Page (Server Component)
  *

@@ -2,6 +2,9 @@ import { getProject, getMaterials, getAssessments } from '@/actions';
 import { ProjectDetailClient } from './ProjectDetailClient';
 import { notFound } from 'next/navigation';
 
+// Force dynamic rendering since we use headers() in auth
+export const dynamic = 'force-dynamic';
+
 /**
  * Project Detail Page (Server Component)
  */

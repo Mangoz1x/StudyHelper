@@ -1,6 +1,9 @@
 import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
 
+// Force dynamic rendering since we use auth/headers
+export const dynamic = 'force-dynamic';
+
 /**
  * Dashboard Page
  *

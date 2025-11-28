@@ -76,6 +76,11 @@ const MaterialSchema = new mongoose.Schema(
             url: String,
             thumbnailUrl: String,
             duration: Number, // in seconds
+            // Whether to use transcript instead of full video
+            transcriptOnly: {
+                type: Boolean,
+                default: false,
+            },
         },
 
         // For text content (notes, etc.)
@@ -85,6 +90,11 @@ const MaterialSchema = new mongoose.Schema(
                 type: String,
                 enum: ['plain', 'markdown', 'html'],
                 default: 'plain',
+            },
+            // Source of the text content (for transcripts)
+            source: {
+                type: String,
+                enum: ['manual', 'youtube_transcript', 'whisper_transcript'],
             },
         },
 
