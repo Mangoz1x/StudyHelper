@@ -125,7 +125,6 @@ export function AddMaterialModal({ open, onClose, projectId, onMaterialAdded }) 
                     url,
                     name,
                     description,
-                    transcriptOnly: videoMode === 'transcript',
                 });
                 break;
             case 'link':
@@ -229,49 +228,6 @@ export function AddMaterialModal({ open, onClose, projectId, onMaterialAdded }) 
                             onChange={(e) => setUrl(e.target.value)}
                             required
                         />
-
-                        {/* Video Mode Selection */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Processing Mode
-                            </label>
-                            <div className="grid grid-cols-2 gap-3">
-                                {VIDEO_MODES.map((mode) => (
-                                    <button
-                                        key={mode.id}
-                                        type="button"
-                                        onClick={() => setVideoMode(mode.id)}
-                                        className={`
-                                            p-3 rounded-lg border-2 text-left transition-all
-                                            ${videoMode === mode.id
-                                                ? 'border-blue-500 bg-blue-50'
-                                                : 'border-gray-200 hover:border-gray-300'
-                                            }
-                                        `}
-                                    >
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <mode.icon className={`w-4 h-4 ${videoMode === mode.id ? 'text-blue-600' : 'text-gray-500'}`} />
-                                            <span className={`text-sm font-medium ${videoMode === mode.id ? 'text-blue-700' : 'text-gray-700'}`}>
-                                                {mode.label}
-                                            </span>
-                                        </div>
-                                        <p className="text-xs text-gray-500 leading-tight">
-                                            {mode.description}
-                                        </p>
-                                    </button>
-                                ))}
-                            </div>
-                            {videoMode === 'transcript' && (
-                                <div className="mt-2 flex items-start gap-2 p-2 rounded-lg bg-amber-50 border border-amber-200">
-                                    <Info className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
-                                    <p className="text-xs text-amber-700">
-                                        Transcript will be extracted from YouTube captions if available.
-                                        This is faster but won&apos;t analyze visual content.
-                                    </p>
-                                </div>
-                            )}
-                        </div>
-
                         <Input
                             label="Custom Title (optional)"
                             placeholder="Leave empty to use video title"

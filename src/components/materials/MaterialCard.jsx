@@ -89,6 +89,35 @@ export function MaterialCard({ material, onDeleted }) {
                                     }}
                                 />
                             </div>
+                        ) : material.type === 'image' && material.file?.gridfsId ? (
+                            <div className="w-20 h-12 rounded-lg overflow-hidden bg-gray-100">
+                                <img
+                                    src={`/api/files/${material.file.gridfsId}`}
+                                    alt={material.name}
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                        e.target.style.display = 'none';
+                                        e.target.parentElement.innerHTML = '<div class="w-full h-full flex items-center justify-center"><svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg></div>';
+                                    }}
+                                />
+                            </div>
+                        ) : material.type === 'video' && material.file?.gridfsId ? (
+                            <div className="w-20 h-12 rounded-lg overflow-hidden bg-gray-900 flex items-center justify-center relative">
+                                <Video className="w-6 h-6 text-white/70" />
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                    <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center">
+                                        <div className="w-0 h-0 border-t-[5px] border-t-transparent border-l-[8px] border-l-white border-b-[5px] border-b-transparent ml-0.5" />
+                                    </div>
+                                </div>
+                            </div>
+                        ) : material.type === 'pdf' && material.file?.gridfsId ? (
+                            <div className="w-20 h-12 rounded-lg overflow-hidden bg-red-50 flex items-center justify-center">
+                                <File className="w-6 h-6 text-red-500" />
+                            </div>
+                        ) : material.type === 'audio' && material.file?.gridfsId ? (
+                            <div className="w-20 h-12 rounded-lg overflow-hidden bg-purple-50 flex items-center justify-center">
+                                <Music className="w-6 h-6 text-purple-500" />
+                            </div>
                         ) : (
                             <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center">
                                 <IconComponent className="w-5 h-5 text-gray-500" />

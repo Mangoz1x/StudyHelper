@@ -62,12 +62,16 @@ const MaterialSchema = new mongoose.Schema(
             mimeType: String,
             // File size in bytes
             size: Number,
-            // Storage URL (S3, local, etc.)
+            // GridFS file ID (permanent storage)
+            gridfsId: String,
+            // Storage URL (S3, local, etc.) - legacy
             url: String,
-            // Gemini file URI (for AI processing)
+            // Gemini file URI (for AI processing) - temporary, expires after 48h
             geminiUri: String,
             // Gemini file name (for cleanup)
             geminiFileName: String,
+            // When the Gemini file was uploaded (to check expiration)
+            geminiUploadedAt: Date,
         },
 
         // For YouTube links

@@ -214,7 +214,7 @@ export const generateContentStream = (options) => {
  * Use this for files larger than 20MB or when reusing files across prompts.
  *
  * @param {Object} options
- * @param {string|Buffer} options.file - File path or buffer
+ * @param {string|Buffer|Blob} options.file - File path, buffer, or Blob
  * @param {string} options.mimeType - MIME type of the file
  * @param {string} [options.displayName] - Display name for the file
  * @returns {Promise<Object>} File object with uri and mimeType
@@ -229,8 +229,14 @@ export const generateContentStream = (options) => {
 export const uploadFile = async ({ file, mimeType, displayName }) => {
     const ai = getGemini();
 
+    // Convert Buffer to Blob if necessary (SDK expects file path or Blob)
+    let fileToUpload = file;
+    if (Buffer.isBuffer(file)) {
+        fileToUpload = new Blob([file], { type: mimeType });
+    }
+
     const result = await ai.files.upload({
-        file,
+        file: fileToUpload,
         config: {
             mimeType,
             displayName,

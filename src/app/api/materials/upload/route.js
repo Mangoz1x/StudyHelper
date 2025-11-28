@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { Project, Material } from '@/models';
-import { connectDB, uploadFile, waitForFileProcessing, transcribeWithWhisper, isGroqConfigured } from '@/utils/clients';
+import { connectDB, uploadFile, waitForFileProcessing, transcribeWithWhisper, isGroqConfigured, uploadToGridFS } from '@/utils/clients';
 
 /**
  * POST /api/materials/upload
@@ -174,13 +174,24 @@ export async function POST(request) {
             }
         }
 
-        // Full file upload mode (upload to Gemini)
+        // Full file upload mode (store in GridFS + upload to Gemini)
         try {
             // Convert file to buffer
             const arrayBuffer = await file.arrayBuffer();
             const buffer = Buffer.from(arrayBuffer);
 
-            // Upload to Gemini
+            // Store permanently in GridFS
+            const gridfsResult = await uploadToGridFS({
+                buffer,
+                filename: file.name,
+                mimeType,
+                metadata: {
+                    projectId,
+                    userId: session.user.id,
+                },
+            });
+
+            // Upload to Gemini for immediate use
             const uploadedFile = await uploadFile({
                 file: buffer,
                 mimeType,
@@ -211,8 +222,10 @@ export async function POST(request) {
                     originalName: file.name,
                     mimeType,
                     size: file.size,
+                    gridfsId: gridfsResult.fileId,
                     geminiUri: processedFile.uri,
                     geminiFileName: processedFile.name,
+                    geminiUploadedAt: new Date(),
                 },
                 status: 'ready',
                 order,
@@ -234,8 +247,7 @@ export async function POST(request) {
                         originalName: file.name,
                         mimeType,
                         size: file.size,
-                        geminiUri: processedFile.uri,
-                        geminiFileName: processedFile.name,
+                        gridfsId: gridfsResult.fileId,
                     },
                     status: material.status,
                     order: material.order,
@@ -244,15 +256,25 @@ export async function POST(request) {
             });
         } catch (uploadError) {
             console.error('File upload failed:', uploadError);
+            console.error('Upload error details:', {
+                message: uploadError.message,
+                stack: uploadError.stack,
+                name: uploadError.name,
+            });
             return NextResponse.json(
-                { error: 'Failed to upload file. Please try again.' },
+                { error: `Failed to upload file: ${uploadError.message}` },
                 { status: 500 }
             );
         }
     } catch (error) {
         console.error('Upload API error:', error);
+        console.error('API error details:', {
+            message: error.message,
+            stack: error.stack,
+            name: error.name,
+        });
         return NextResponse.json(
-            { error: 'Internal server error' },
+            { error: `Internal server error: ${error.message}` },
             { status: 500 }
         );
     }

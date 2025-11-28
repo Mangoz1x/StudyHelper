@@ -36,3 +36,11 @@ export {
     transcribeWithWhisper,
     isGroqConfigured,
 } from './groq';
+
+// GridFS (File storage)
+export {
+    uploadToGridFS,
+    downloadFromGridFS,
+    deleteFromGridFS,
+    fileExistsInGridFS,
+} from './gridfs';

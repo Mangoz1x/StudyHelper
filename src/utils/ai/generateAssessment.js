@@ -1,4 +1,5 @@
 import { generateContent, GEMINI_MODELS, THINKING_LEVELS, z } from '@/utils/clients';
+import { ensureGeminiFilesForMaterials } from '@/utils/ensureGeminiFile';
 
 /**
  * Zod schema for assessment structured output
@@ -183,8 +184,28 @@ function prepareFileAttachments(materials) {
  * @returns {Promise<Object>} Generated assessment data
  */
 export async function generateAssessmentQuestions({ materials, settings, onProgress }) {
+    // Ensure all file-based materials have valid (non-expired) Gemini files
+    // This will re-upload from GridFS if the Gemini file has expired (48h limit)
+    const geminiFileMap = await ensureGeminiFilesForMaterials(materials);
+
+    // Update materials with fresh Gemini URIs where needed
+    const materialsWithFreshFiles = materials.map(m => {
+        const freshFile = geminiFileMap.get(m._id?.toString());
+        if (freshFile && m.file) {
+            return {
+                ...m,
+                file: {
+                    ...m.file,
+                    geminiUri: freshFile.uri,
+                    mimeType: freshFile.mimeType,
+                },
+            };
+        }
+        return m;
+    });
+
     // Filter materials - need text content, summary, YouTube URL, or uploaded file
-    const usableMaterials = materials.filter(m =>
+    const usableMaterials = materialsWithFreshFiles.filter(m =>
         m.content?.text ||
         m.summary ||
         (m.type === 'youtube' && m.youtube?.url) ||
