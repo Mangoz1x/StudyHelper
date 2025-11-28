@@ -138,6 +138,19 @@ const MaterialSchema = new mongoose.Schema(
             type: Number,
             default: 0,
         },
+
+        // Scope: whether material is available globally or only in study mode
+        scope: {
+            type: String,
+            enum: ['project', 'study_mode'],
+            default: 'project',
+        },
+
+        // For study_mode scoped materials, which chat they belong to (optional)
+        studyChatId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'StudyChat',
+        },
     },
     {
         timestamps: true,
@@ -148,6 +161,8 @@ const MaterialSchema = new mongoose.Schema(
 MaterialSchema.index({ projectId: 1, order: 1 });
 MaterialSchema.index({ projectId: 1, status: 1 });
 MaterialSchema.index({ userId: 1, createdAt: -1 });
+MaterialSchema.index({ projectId: 1, scope: 1, status: 1 });
+MaterialSchema.index({ studyChatId: 1 }, { sparse: true });
 
 // Prevent model recompilation in development
 export const Material = mongoose.models.Material || mongoose.model('Material', MaterialSchema);

@@ -19,3 +19,8 @@ export { Project } from './Project';
 export { Material } from './Material';
 export { Assessment } from './Assessment';
 export { AssessmentAttempt } from './AssessmentAttempt';
+
+// Study mode models
+export { StudyChat } from './StudyChat';
+export { StudyMessage } from './StudyMessage';
+export { StudyMemory } from './StudyMemory';

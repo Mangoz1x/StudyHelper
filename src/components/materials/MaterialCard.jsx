@@ -18,6 +18,7 @@ import {
     CheckCircle,
     AlertCircle,
     Clock,
+    MessageSquare,
 } from 'lucide-react';
 
 const TYPE_ICONS = {
@@ -174,6 +175,12 @@ export function MaterialCard({ material, onDeleted }) {
                             <span className="text-xs text-gray-500 capitalize">
                                 {material.type}
                             </span>
+                            {material.scope === 'study_mode' && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-violet-50 text-violet-600">
+                                    <MessageSquare className="w-3 h-3" />
+                                    Study Only
+                                </span>
+                            )}
                         </div>
 
                         {/* Summary preview */}

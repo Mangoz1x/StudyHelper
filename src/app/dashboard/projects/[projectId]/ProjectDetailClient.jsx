@@ -233,12 +233,12 @@ export function ProjectDetailClient({ project, initialMaterials, initialAssessme
                         </div>
                     </button>
 
-                    <button
-                        disabled
-                        className="p-5 rounded-2xl bg-white border border-gray-200 opacity-50 cursor-not-allowed text-left"
+                    <Link
+                        href={`/study/${project.id}`}
+                        className="group p-5 rounded-2xl bg-white border border-gray-200 hover:border-green-300 hover:shadow-md transition-all text-left"
                     >
                         <div className="flex items-center gap-4">
-                            <div className="p-3 rounded-xl bg-green-50">
+                            <div className="p-3 rounded-xl bg-green-50 group-hover:bg-green-100 transition-colors">
                                 <Book className="w-6 h-6 text-green-600" />
                             </div>
                             <div>
@@ -246,11 +246,11 @@ export function ProjectDetailClient({ project, initialMaterials, initialAssessme
                                     Study Mode
                                 </h3>
                                 <p className="text-sm text-gray-500">
-                                    Coming soon
+                                    Chat with your materials
                                 </p>
                             </div>
                         </div>
-                    </button>
+                    </Link>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
