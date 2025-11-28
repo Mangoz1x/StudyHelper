@@ -1,35 +1,50 @@
 import mongoose from 'mongoose';
 
-let isConnected = false;
+const MONGODB_URI = process.env.MONGO_URI;
+
+if (!MONGODB_URI) {
+    throw new Error('MONGO_URI environment variable is not defined');
+}
+
+let cached = global.mongoose;
+
+if (!cached) {
+    cached = global.mongoose = { conn: null, promise: null };
+}
 
 /**
  * Connect to MongoDB using Mongoose
- * Uses lazy initialization pattern - connection established only when called
+ * Optimized for serverless environments (Vercel)
+ * Uses global caching to reuse connections across hot reloads
  * @returns {Promise<typeof mongoose>} Mongoose instance
  */
 export const connectDB = async () => {
-    if (isConnected) {
-        return mongoose;
+    if (cached.conn) {
+        return cached.conn;
     }
 
-    const MONGODB_URI = process.env.MONGO_URI;
+    if (!cached.promise) {
+        const opts = {
+            bufferCommands: false,
+            maxPoolSize: 10,
+            serverSelectionTimeoutMS: 5000,
+            socketTimeoutMS: 45000,
+        };
 
-    if (!MONGODB_URI) {
-        throw new Error('MONGO_URI environment variable is not defined');
+        cached.promise = mongoose.connect(MONGODB_URI, opts).then((mongoose) => {
+            console.log('MongoDB connected successfully');
+            return mongoose;
+        });
     }
 
     try {
-        const db = await mongoose.connect(MONGODB_URI, {
-            bufferCommands: false,
-        });
-
-        isConnected = db.connections[0].readyState === 1;
-        console.log('MongoDB connected successfully');
-        return mongoose;
-    } catch (error) {
-        console.error('MongoDB connection error:', error);
-        throw error;
+        cached.conn = await cached.promise;
+    } catch (e) {
+        cached.promise = null;
+        throw e;
     }
+
+    return cached.conn;
 };
 
 /**
@@ -42,4 +57,4 @@ export const getMongoose = () => mongoose;
  * Check if database is connected
  * @returns {boolean} Connection status
  */
-export const isDBConnected = () => isConnected;
+export const isDBConnected = () => cached.conn !== null;
