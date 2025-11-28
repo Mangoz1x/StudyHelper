@@ -41,10 +41,10 @@ function ResultQuestion({ result, index }) {
                                     className={`
                                         p-3 rounded-lg border-2 flex items-center gap-3
                                         ${isCorrectOption
-                                            ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
+                                            ? 'border-green-500 bg-green-50'
                                             : isUserAnswer
-                                                ? 'border-red-500 bg-red-50 dark:bg-red-900/20'
-                                                : 'border-gray-200 dark:border-gray-700'
+                                                ? 'border-red-500 bg-red-50'
+                                                : 'border-gray-200'
                                         }
                                     `}
                                 >
@@ -53,17 +53,17 @@ function ResultQuestion({ result, index }) {
                                     ) : isUserAnswer ? (
                                         <XCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
                                     ) : (
-                                        <div className="w-5 h-5 rounded-full border-2 border-gray-300 dark:border-gray-600 flex-shrink-0" />
+                                        <div className="w-5 h-5 rounded-full border-2 border-gray-300 flex-shrink-0" />
                                     )}
                                     <span className={`
-                                        ${isCorrectOption ? 'text-green-700 dark:text-green-300 font-medium' : ''}
-                                        ${isUserAnswer && !isCorrectOption ? 'text-red-700 dark:text-red-300' : ''}
-                                        ${!isCorrectOption && !isUserAnswer ? 'text-gray-600 dark:text-gray-400' : ''}
+                                        ${isCorrectOption ? 'text-green-700 font-medium' : ''}
+                                        ${isUserAnswer && !isCorrectOption ? 'text-red-700' : ''}
+                                        ${!isCorrectOption && !isUserAnswer ? 'text-gray-600' : ''}
                                     `}>
                                         {option.text}
                                     </span>
                                     {isUserAnswer && (
-                                        <span className="ml-auto text-xs text-gray-500 dark:text-gray-400">
+                                        <span className="ml-auto text-xs text-gray-500">
                                             Your answer
                                         </span>
                                     )}
@@ -89,10 +89,10 @@ function ResultQuestion({ result, index }) {
                                     className={`
                                         p-3 rounded-lg border-2 flex items-center gap-3
                                         ${isCorrectOption
-                                            ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
+                                            ? 'border-green-500 bg-green-50'
                                             : isUserAnswer
-                                                ? 'border-red-500 bg-red-50 dark:bg-red-900/20'
-                                                : 'border-gray-200 dark:border-gray-700'
+                                                ? 'border-red-500 bg-red-50'
+                                                : 'border-gray-200'
                                         }
                                     `}
                                 >
@@ -101,11 +101,11 @@ function ResultQuestion({ result, index }) {
                                     ) : isUserAnswer ? (
                                         <XCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
                                     ) : (
-                                        <div className="w-5 h-5 rounded border-2 border-gray-300 dark:border-gray-600 flex-shrink-0" />
+                                        <div className="w-5 h-5 rounded border-2 border-gray-300 flex-shrink-0" />
                                     )}
                                     <span className={`
-                                        ${isCorrectOption ? 'text-green-700 dark:text-green-300 font-medium' : ''}
-                                        ${isUserAnswer && !isCorrectOption ? 'text-red-700 dark:text-red-300' : ''}
+                                        ${isCorrectOption ? 'text-green-700 font-medium' : ''}
+                                        ${isUserAnswer && !isCorrectOption ? 'text-red-700' : ''}
                                     `}>
                                         {option.text}
                                     </span>
@@ -120,34 +120,34 @@ function ResultQuestion({ result, index }) {
                 return (
                     <div className="space-y-3">
                         <div>
-                            <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            <p className="text-sm font-medium text-gray-700 mb-1">
                                 Your Answer:
                             </p>
-                            <div className={`p-3 rounded-lg border ${isCorrect ? 'border-green-300 bg-green-50 dark:bg-green-900/20' : 'border-gray-300 dark:border-gray-600'}`}>
-                                <p className="text-gray-900 dark:text-white whitespace-pre-wrap">
+                            <div className={`p-3 rounded-lg border ${isCorrect ? 'border-green-300 bg-green-50' : 'border-gray-300'}`}>
+                                <p className="text-gray-900 whitespace-pre-wrap">
                                     {result.userAnswer || <em className="text-gray-400">No answer provided</em>}
                                 </p>
                             </div>
                         </div>
                         <div>
-                            <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            <p className="text-sm font-medium text-gray-700 mb-1">
                                 Expected Answer:
                             </p>
-                            <div className="p-3 rounded-lg border border-green-300 bg-green-50 dark:bg-green-900/20">
-                                <p className="text-green-700 dark:text-green-300 whitespace-pre-wrap">
+                            <div className="p-3 rounded-lg border border-green-300 bg-green-50">
+                                <p className="text-green-700 whitespace-pre-wrap">
                                     {result.correctAnswer}
                                 </p>
                             </div>
                         </div>
                         {result.aiFeedback && (
-                            <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+                            <div className="p-3 rounded-lg bg-blue-50 border border-blue-200">
                                 <div className="flex items-start gap-2">
                                     <MessageSquare className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
                                     <div>
-                                        <p className="text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">
+                                        <p className="text-sm font-medium text-blue-700 mb-1">
                                             AI Feedback
                                         </p>
-                                        <p className="text-sm text-blue-600 dark:text-blue-400">
+                                        <p className="text-sm text-blue-600">
                                             {result.aiFeedback}
                                         </p>
                                     </div>
@@ -169,19 +169,19 @@ function ResultQuestion({ result, index }) {
 
                             return (
                                 <div key={i} className="flex items-center gap-3">
-                                    <span className="text-sm text-gray-500 dark:text-gray-400 w-8">
+                                    <span className="text-sm text-gray-500 w-8">
                                         {i + 1}.
                                     </span>
-                                    <div className={`flex-1 p-2 rounded-lg ${isBlankCorrect ? 'bg-green-50 dark:bg-green-900/20' : 'bg-red-50 dark:bg-red-900/20'}`}>
-                                        <span className={isBlankCorrect ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}>
+                                    <div className={`flex-1 p-2 rounded-lg ${isBlankCorrect ? 'bg-green-50' : 'bg-red-50'}`}>
+                                        <span className={isBlankCorrect ? 'text-green-700' : 'text-red-700'}>
                                             {userAnswer || <em>blank</em>}
                                         </span>
                                     </div>
                                     {!isBlankCorrect && (
                                         <>
                                             <span className="text-gray-400">→</span>
-                                            <div className="flex-1 p-2 rounded-lg bg-green-50 dark:bg-green-900/20">
-                                                <span className="text-green-700 dark:text-green-300 font-medium">
+                                            <div className="flex-1 p-2 rounded-lg bg-green-50">
+                                                <span className="text-green-700 font-medium">
                                                     {correct}
                                                 </span>
                                             </div>
@@ -206,16 +206,16 @@ function ResultQuestion({ result, index }) {
                         <span className={`
                             flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold
                             ${isCorrect
-                                ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400'
+                                ? 'bg-green-100 text-green-600'
                                 : hasPartialCredit
-                                    ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400'
-                                    : 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'
+                                    ? 'bg-amber-100 text-amber-600'
+                                    : 'bg-red-100 text-red-600'
                             }
                         `}>
                             {index + 1}
                         </span>
                         <div>
-                            <p className="text-gray-900 dark:text-white font-medium">
+                            <p className="text-gray-900 font-medium">
                                 {result.question}
                             </p>
                         </div>
@@ -226,7 +226,7 @@ function ResultQuestion({ result, index }) {
                         ) : (
                             <XCircle className="w-5 h-5 text-red-500" />
                         )}
-                        <span className={`text-sm font-medium ${isCorrect ? 'text-green-600 dark:text-green-400' : hasPartialCredit ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'}`}>
+                        <span className={`text-sm font-medium ${isCorrect ? 'text-green-600' : hasPartialCredit ? 'text-amber-600' : 'text-red-600'}`}>
                             {result.pointsEarned}/{result.points} pts
                         </span>
                     </div>
@@ -235,11 +235,11 @@ function ResultQuestion({ result, index }) {
                 {renderAnswer()}
 
                 {result.explanation && (
-                    <div className="mt-4 p-3 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-                        <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <div className="mt-4 p-3 rounded-lg bg-gray-50 border border-gray-200">
+                        <p className="text-sm font-medium text-gray-700 mb-1">
                             Explanation
                         </p>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                        <p className="text-sm text-gray-600">
                             {result.explanation}
                         </p>
                     </div>
@@ -528,7 +528,7 @@ export function ResultsClient({ results, projectId, assessmentId, attemptId, err
 
             {/* Question Results */}
             <div>
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">
                     Question Review
                 </h2>
                 <div className="space-y-4">

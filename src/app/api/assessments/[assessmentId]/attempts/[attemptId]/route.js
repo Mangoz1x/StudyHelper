@@ -68,6 +68,16 @@ export async function POST(request, { params }) {
                         let isCorrect = false;
                         let pointsEarned = 0;
 
+                        // Skip grading questions with invalid options
+                        const requiresOptions = ['multiple_choice', 'multiple_select', 'true_false'];
+                        if (requiresOptions.includes(question.type) && (!question.options || question.options.length < 2)) {
+                            console.warn('[Grading] Skipping question with invalid options:', question.question);
+                            answer.isCorrect = false;
+                            answer.pointsEarned = 0;
+                            sendSSE('progress', { current: i + 1, total: totalQuestions });
+                            continue;
+                        }
+
                         switch (question.type) {
                             case 'multiple_choice':
                             case 'true_false':
@@ -76,6 +86,10 @@ export async function POST(request, { params }) {
                                 break;
 
                             case 'multiple_select':
+                                if (!Array.isArray(question.correctAnswer)) {
+                                    console.warn('[Grading] Invalid correctAnswer for multiple_select:', question.question);
+                                    break;
+                                }
                                 const correctSet = new Set(question.correctAnswer);
                                 const answerSet = new Set(answer.answer || []);
                                 isCorrect = correctSet.size === answerSet.size &&
@@ -84,6 +98,10 @@ export async function POST(request, { params }) {
                                 break;
 
                             case 'fill_blank':
+                                if (!Array.isArray(question.correctAnswer)) {
+                                    console.warn('[Grading] Invalid correctAnswer for fill_blank, expected array:', question.question);
+                                    break;
+                                }
                                 const correctAnswers = question.correctAnswer.map((a) => a.toLowerCase().trim());
                                 const userAnswers = (answer.answer || []).map((a) => a.toLowerCase().trim());
                                 const correctCount = correctAnswers.filter((ca, i) => userAnswers[i] === ca).length;

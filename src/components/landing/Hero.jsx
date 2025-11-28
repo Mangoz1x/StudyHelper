@@ -1,15 +1,19 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useRef, useState } from 'react';
 import Link from 'next/link';
 import { ArrowRight, Sparkles, Play } from 'lucide-react';
 
 export default function Hero() {
   const [mounted, setMounted] = useState(false);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  // Use ref to track if component has mounted (null check pattern for React Compiler)
+  const mountedRef = useRef(null);
+  if (mountedRef.current == null) {
+    mountedRef.current = true;
+    // Trigger animation on next frame
+    requestAnimationFrame(() => setMounted(true));
+  }
 
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-[var(--bg-primary)]">

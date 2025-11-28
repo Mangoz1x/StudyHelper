@@ -337,7 +337,7 @@ function ProjectDemo() {
             </div>
             <h3 className="text-xl font-semibold text-[var(--text-primary)] mb-2">Project Created!</h3>
             <p className="text-[var(--text-secondary)] mb-6">
-              "{projectName}" is ready for your study materials
+              &ldquo;{projectName}&rdquo; is ready for your study materials
             </p>
             <div className="flex gap-3 justify-center">
               <button className="inline-flex items-center gap-2 py-2.5 px-4 bg-gradient-to-r from-blue-600 to-violet-600 text-white font-medium rounded-xl text-sm">

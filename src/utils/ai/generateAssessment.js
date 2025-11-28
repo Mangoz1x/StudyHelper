@@ -5,23 +5,25 @@ import { generateContent, GEMINI_MODELS, THINKING_LEVELS, z } from '@/utils/clie
  * @see https://ai.google.dev/gemini-api/docs/structured-output
  */
 const AssessmentSchema = z.object({
-    title: z.string(),
-    description: z.string(),
+    title: z.string().describe('Title of the assessment'),
+    description: z.string().describe('Brief description of what this assessment covers'),
     questions: z.array(z.object({
-        type: z.enum(['multiple_choice', 'multiple_select', 'true_false', 'short_answer', 'long_answer', 'fill_blank']),
-        question: z.string(),
+        type: z.enum(['multiple_choice', 'multiple_select', 'true_false', 'short_answer', 'long_answer', 'fill_blank'])
+            .describe('Type of question: multiple_choice (single answer with 4 options), multiple_select (multiple answers from options), true_false (2 options: true/false), short_answer (text input), long_answer (text area), fill_blank (fill in the blanks)'),
+        question: z.string().describe('The question text'),
         options: z.array(z.object({
-            id: z.string(),
-            text: z.string(),
-            isCorrect: z.boolean(),
-        })).optional(),
-        correctAnswer: z.union([z.string(), z.array(z.string()), z.boolean()]),
-        explanation: z.string(),
-        points: z.number().default(1),
-        difficulty: z.enum(['easy', 'medium', 'hard']),
-        topic: z.string().optional(),
-        hint: z.string().optional(),
-    })),
+            id: z.string().describe('Unique identifier for this option (e.g., "a", "b", "c", "d" for multiple choice, "true"/"false" for true/false)'),
+            text: z.string().describe('The text content of this option'),
+            isCorrect: z.boolean().describe('Whether this option is correct'),
+        })).optional().describe('Array of answer options. REQUIRED for multiple_choice (4 options), multiple_select (2-6 options), and true_false (exactly 2 options with ids "true" and "false"). NOT used for short_answer, long_answer, or fill_blank.'),
+        correctAnswer: z.union([z.string(), z.array(z.string()), z.boolean()])
+            .describe('The correct answer: string (option id for multiple_choice/true_false, or expected text for short_answer/long_answer), array of strings (option ids for multiple_select, or expected texts for fill_blank)'),
+        explanation: z.string().describe('Explanation of why this is the correct answer'),
+        points: z.number().default(1).describe('Points awarded for correct answer'),
+        difficulty: z.enum(['easy', 'medium', 'hard']).describe('Difficulty level of this question'),
+        topic: z.string().optional().describe('Topic or subject area this question covers'),
+        hint: z.string().optional().describe('Optional hint to help answer the question'),
+    })).describe('Array of assessment questions'),
 });
 
 /** Grading schema for AI-graded answers */
@@ -89,19 +91,51 @@ Difficulty: ${difficulty}${focusTopics.length ? `\nTopics: ${focusTopics.join(',
     return prompt;
 }
 
-/** Validate questions have required fields */
+/** Validate questions have required fields and filter out malformed questions */
 function validateQuestions(questions) {
-    return questions.filter(q => q.question && q.type).map(q => ({
-        type: q.type,
-        question: q.question,
-        options: q.options,
-        correctAnswer: q.correctAnswer ?? '',
-        explanation: q.explanation ?? '',
-        points: q.points ?? 1,
-        difficulty: q.difficulty ?? 'medium',
-        topic: q.topic ?? '',
-        hint: q.hint ?? '',
-    }));
+    return questions
+        .filter(q => {
+            // Basic validation
+            if (!q.question || !q.type) return false;
+
+            // Questions that require options
+            const requiresOptions = ['multiple_choice', 'multiple_select', 'true_false'];
+            if (requiresOptions.includes(q.type)) {
+                // Must have at least 2 options
+                if (!q.options || !Array.isArray(q.options) || q.options.length < 2) {
+                    console.warn(`[Validation] Skipping ${q.type} question without valid options:`, q.question);
+                    return false;
+                }
+                // true_false must have exactly 2 options
+                if (q.type === 'true_false' && q.options.length !== 2) {
+                    console.warn(`[Validation] Skipping true_false question without exactly 2 options:`, q.question);
+                    return false;
+                }
+            }
+
+            // Validate correctAnswer type matches question type
+            if (q.type === 'multiple_select' && !Array.isArray(q.correctAnswer)) {
+                console.warn(`[Validation] Skipping multiple_select question with non-array correctAnswer:`, q.question);
+                return false;
+            }
+            if (q.type === 'fill_blank' && !Array.isArray(q.correctAnswer)) {
+                console.warn(`[Validation] Skipping fill_blank question with non-array correctAnswer:`, q.question);
+                return false;
+            }
+
+            return true;
+        })
+        .map(q => ({
+            type: q.type,
+            question: q.question,
+            options: q.options,
+            correctAnswer: q.correctAnswer ?? '',
+            explanation: q.explanation ?? '',
+            points: q.points ?? 1,
+            difficulty: q.difficulty ?? 'medium',
+            topic: q.topic ?? '',
+            hint: q.hint ?? '',
+        }));
 }
 
 /**

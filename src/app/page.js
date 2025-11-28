@@ -80,7 +80,14 @@ function Nav() {
 // Hero
 function Hero() {
   const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+
+  // Use ref to track if component has mounted (null check pattern for React Compiler)
+  const mountedRef = useRef(null);
+  if (mountedRef.current == null) {
+    mountedRef.current = true;
+    // Trigger animation on next frame
+    requestAnimationFrame(() => setMounted(true));
+  }
 
   return (
     <section className="min-h-screen flex flex-col justify-center items-center px-6 bg-gradient-to-b from-blue-50 via-white to-white relative overflow-hidden">
@@ -169,7 +176,7 @@ function UploadSection() {
               <span className="text-gradient">materials</span>
             </h2>
             <p className="text-lg text-gray-500 leading-relaxed max-w-md">
-              PDFs, images, videos, notes — anything you're studying.
+              PDFs, images, videos, notes — anything you&apos;re studying.
               We process all formats instantly.
             </p>
           </div>
@@ -582,7 +589,7 @@ function ProgressSection() {
             </h2>
             <p className="text-lg text-gray-500 leading-relaxed max-w-md">
               Track your progress with detailed analytics.
-              See what you've mastered and where to focus next.
+              See what you&apos;ve mastered and where to focus next.
             </p>
           </div>
         </div>

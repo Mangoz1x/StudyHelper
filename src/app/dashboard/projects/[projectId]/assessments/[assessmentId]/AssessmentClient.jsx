@@ -24,9 +24,23 @@ function Question({ question, index, answer, onAnswer, disabled }) {
         switch (question.type) {
             case 'multiple_choice':
             case 'true_false':
+                // Validate options exist
+                if (!question.options || question.options.length < 2) {
+                    return (
+                        <div className="p-4 rounded-lg border-2 border-amber-200 bg-amber-50">
+                            <div className="flex items-center gap-2 text-amber-700">
+                                <AlertCircle className="w-5 h-5" />
+                                <span className="text-sm">
+                                    This question has incomplete options and cannot be answered.
+                                </span>
+                            </div>
+                        </div>
+                    );
+                }
+
                 return (
                     <div className="space-y-2">
-                        {question.options?.map((option) => (
+                        {question.options.map((option) => (
                             <button
                                 key={option.id}
                                 onClick={() => onAnswer(option.id)}
@@ -62,13 +76,27 @@ function Question({ question, index, answer, onAnswer, disabled }) {
                 );
 
             case 'multiple_select':
+                // Validate options exist
+                if (!question.options || question.options.length < 2) {
+                    return (
+                        <div className="p-4 rounded-lg border-2 border-amber-200 bg-amber-50">
+                            <div className="flex items-center gap-2 text-amber-700">
+                                <AlertCircle className="w-5 h-5" />
+                                <span className="text-sm">
+                                    This question has incomplete options and cannot be answered.
+                                </span>
+                            </div>
+                        </div>
+                    );
+                }
+
                 const selectedAnswers = Array.isArray(answer) ? answer : [];
                 return (
                     <div className="space-y-2">
                         <p className="text-sm text-gray-500 mb-3">
                             Select all that apply
                         </p>
-                        {question.options?.map((option) => {
+                        {question.options.map((option) => {
                             const isSelected = selectedAnswers.includes(option.id);
                             return (
                                 <button
@@ -233,36 +261,13 @@ export function AssessmentClient({ assessment, attempt, projectId, error }) {
     const [saving, setSaving] = useState(false);
     const [submitting, setSubmitting] = useState(false);
 
-    if (error) {
-        return (
-            <div className="text-center py-12">
-                <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-                <p className="text-red-600 dark:text-red-400">{error}</p>
-                <Link href={`/dashboard/projects/${projectId}`}>
-                    <Button variant="secondary" className="mt-4">
-                        Back to Project
-                    </Button>
-                </Link>
-            </div>
-        );
-    }
-
-    if (!assessment || !attempt) {
-        return null;
-    }
-
-    const questions = assessment.questions || [];
-    const currentQuestion = questions[currentIndex];
-    const totalQuestions = questions.length;
-    const answeredCount = Object.keys(answers).length;
-
     const handleAnswer = useCallback(async (answer) => {
         setAnswers((prev) => ({ ...prev, [currentIndex]: answer }));
 
         // Auto-save answer
         setSaving(true);
         await submitAnswer({
-            attemptId: attempt.id,
+            attemptId: attempt?.id,
             questionIndex: currentIndex,
             answer,
         });
@@ -288,10 +293,33 @@ export function AssessmentClient({ assessment, attempt, projectId, error }) {
     };
 
     const goToNext = () => {
-        if (currentIndex < totalQuestions - 1) {
+        if (currentIndex < (assessment?.questions?.length || 0) - 1) {
             setCurrentIndex(currentIndex + 1);
         }
     };
+
+    if (error) {
+        return (
+            <div className="text-center py-12">
+                <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+                <p className="text-red-600">{error}</p>
+                <Link href={`/dashboard/projects/${projectId}`}>
+                    <Button variant="secondary" className="mt-4">
+                        Back to Project
+                    </Button>
+                </Link>
+            </div>
+        );
+    }
+
+    if (!assessment || !attempt) {
+        return null;
+    }
+
+    const questions = assessment.questions || [];
+    const currentQuestion = questions[currentIndex];
+    const totalQuestions = questions.length;
+    const answeredCount = Object.keys(answers).length;
 
     return (
         <div className="max-w-4xl mx-auto space-y-6">

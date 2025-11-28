@@ -5,8 +5,22 @@ import { notFound } from 'next/navigation';
 /**
  * Assessment Results Page (Server Component)
  */
-export default async function ResultsPage({ params }) {
+export default async function ResultsPage({ params, searchParams }) {
     const { projectId, assessmentId, attemptId } = await params;
+    const resolvedSearchParams = await searchParams;
+
+    // If grading is in progress, skip fetching results and let client handle it
+    if (resolvedSearchParams?.grading === 'true') {
+        return (
+            <ResultsClient
+                results={null}
+                projectId={projectId}
+                assessmentId={assessmentId}
+                attemptId={attemptId}
+                error={null}
+            />
+        );
+    }
 
     const result = await getAttemptResults(attemptId);
 
