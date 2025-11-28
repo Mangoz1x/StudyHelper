@@ -1,19 +1,19 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { signIn } from 'next-auth/react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui';
 import { SocialLoginButton } from '@/components/auth/SocialLoginButton';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Loader2 } from 'lucide-react';
 
 /**
- * Sign In Page
+ * Sign In Page Content
  *
- * Clean, modern sign-in page with social login options
+ * Inner component that uses useSearchParams
  */
-export default function SignInPage() {
+function SignInContent() {
     const searchParams = useSearchParams();
     const callbackUrl = searchParams.get('callbackUrl') || '/dashboard';
     const error = searchParams.get('error');
@@ -93,5 +93,34 @@ export default function SignInPage() {
                 </div>
             </CardContent>
         </Card>
+    );
+}
+
+/**
+ * Sign In Page Loading Fallback
+ */
+function SignInLoading() {
+    return (
+        <Card variant="glass" padding="lg">
+            <CardContent>
+                <div className="flex items-center justify-center py-12">
+                    <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
+
+/**
+ * Sign In Page
+ *
+ * Clean, modern sign-in page with social login options
+ * Wrapped in Suspense for useSearchParams
+ */
+export default function SignInPage() {
+    return (
+        <Suspense fallback={<SignInLoading />}>
+            <SignInContent />
+        </Suspense>
     );
 }
