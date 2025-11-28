@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { User, Bot, Copy, Check, ChevronDown, ChevronUp, FileText, Film, FileAudio, Image as ImageIcon } from 'lucide-react';
+import { User, Bot, Copy, Check, ChevronDown, ChevronUp, FileText, Film, FileAudio, Image as ImageIcon, RotateCcw, AlertCircle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { InlineQuestion } from './InlineQuestion';
 
@@ -108,9 +108,11 @@ export function UserMessage({ message }) {
  * @param {Object} props
  * @param {Object} props.message - The message object
  * @param {boolean} props.isStreaming - Whether the message is currently streaming
+ * @param {boolean} props.isError - Whether the message encountered an error
+ * @param {Function} props.onRetry - Callback to retry the message
  * @param {Function} props.onQuestionAnswer - Callback when an inline question is answered
  */
-export function AssistantMessage({ message, isStreaming = false, onQuestionAnswer }) {
+export function AssistantMessage({ message, isStreaming = false, isError = false, onRetry, onQuestionAnswer }) {
     const [copied, setCopied] = useState(false);
     const [showToolCalls, setShowToolCalls] = useState(false);
 
@@ -127,7 +129,8 @@ export function AssistantMessage({ message, isStreaming = false, onQuestionAnswe
     const hasToolCalls = message.toolCalls && message.toolCalls.length > 0;
     const hasInlineQuestion = message.inlineQuestion;
     const hasContent = message.content && message.content.trim().length > 0;
-    const showMessageBubble = hasContent || isStreaming;
+    const isErrorMessage = isError || message.isError;
+    const showMessageBubble = hasContent || isStreaming || isErrorMessage;
 
     return (
         <div className="flex gap-3">
@@ -137,8 +140,24 @@ export function AssistantMessage({ message, isStreaming = false, onQuestionAnswe
             <div className="flex-1 max-w-[85%]">
                 {/* Main content - only show bubble if there's content or streaming */}
                 {showMessageBubble && (
-                    <div className="bg-gray-100 rounded-2xl rounded-bl-md px-4 py-3">
-                        {hasContent ? (
+                    <div className={`rounded-2xl rounded-bl-md px-4 py-3 ${isErrorMessage ? 'bg-red-50' : 'bg-gray-100'}`}>
+                        {isErrorMessage ? (
+                            <div className="flex items-center justify-between gap-3">
+                                <div className="flex items-center gap-2 text-red-600">
+                                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                                    <span className="text-sm">Something went wrong. Please try again.</span>
+                                </div>
+                                {onRetry && (
+                                    <button
+                                        onClick={onRetry}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-100 rounded-lg transition-colors"
+                                    >
+                                        <RotateCcw className="w-4 h-4" />
+                                        Retry
+                                    </button>
+                                )}
+                            </div>
+                        ) : hasContent ? (
                             <div className="markdown-content text-gray-900">
                                 <ReactMarkdown
                                     components={{
@@ -281,8 +300,9 @@ function ToolCallBadge({ toolCall }) {
  * @param {Object} props.message - The message object
  * @param {boolean} props.isStreaming - Whether the message is currently streaming
  * @param {Function} props.onQuestionAnswer - Callback when an inline question is answered
+ * @param {Function} props.onRetry - Callback to retry a failed message
  */
-export function MessageBubble({ message, isStreaming = false, onQuestionAnswer }) {
+export function MessageBubble({ message, isStreaming = false, onQuestionAnswer, onRetry }) {
     if (message.role === 'user') {
         return <UserMessage message={message} />;
     }
@@ -292,6 +312,7 @@ export function MessageBubble({ message, isStreaming = false, onQuestionAnswer }
             message={message}
             isStreaming={isStreaming}
             onQuestionAnswer={onQuestionAnswer}
+            onRetry={onRetry}
         />
     );
 }

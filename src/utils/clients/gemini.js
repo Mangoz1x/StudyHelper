@@ -352,7 +352,7 @@ export const SUPPORTED_MIME_TYPES = {
         'audio/ogg',
         'audio/flac',
     ],
-    // Documents
+    // Documents & Text
     documents: [
         'application/pdf',
         'text/plain',
@@ -361,6 +361,20 @@ export const SUPPORTED_MIME_TYPES = {
         'text/javascript',
         'application/json',
         'text/markdown',
+        'text/csv',
+        'text/xml',
+        'application/xml',
+        'text/x-python',
+        'text/x-java',
+        'text/x-c',
+        'text/x-c++',
+        'text/x-ruby',
+        'text/x-go',
+        'text/x-rust',
+        'text/x-swift',
+        'text/x-kotlin',
+        'application/x-yaml',
+        'text/yaml',
     ],
 };
 

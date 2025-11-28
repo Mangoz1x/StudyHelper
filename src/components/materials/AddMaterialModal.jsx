@@ -18,7 +18,7 @@ const MATERIAL_TYPES = [
     { id: 'text', label: 'Text Notes', icon: FileText, description: 'Add text content or notes' },
     { id: 'youtube', label: 'YouTube Video', icon: Youtube, description: 'Link a YouTube video' },
     { id: 'link', label: 'Web Link', icon: LinkIcon, description: 'Add a website or article' },
-    { id: 'file', label: 'Upload File', icon: Upload, description: 'PDF, images, audio, or video files' },
+    { id: 'file', label: 'Upload File', icon: Upload, description: 'PDF, text files, images, audio, or video' },
 ];
 
 const VIDEO_MODES = [
@@ -280,7 +280,7 @@ export function AddMaterialModal({ open, onClose, projectId, onMaterialAdded }) 
                                 ref={fileInputRef}
                                 type="file"
                                 onChange={handleFileChange}
-                                accept="application/pdf,image/*,video/*,audio/*"
+                                accept="application/pdf,image/*,video/*,audio/*,text/*,.txt,.md,.markdown,.json,.csv,.xml,.html,.htm,.js,.jsx,.ts,.tsx,.css,.py,.java,.c,.cpp,.h,.hpp,.rb,.go,.rs,.swift,.kt"
                                 className="hidden"
                             />
                             {!file ? (

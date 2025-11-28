@@ -110,7 +110,7 @@ export function ChatInput({
                     ref={fileInputRef}
                     type="file"
                     onChange={handleFileSelect}
-                    accept="application/pdf,image/*,video/*,audio/*"
+                    accept="application/pdf,image/*,video/*,audio/*,text/*,.txt,.md,.markdown,.json,.csv,.xml,.html,.htm,.js,.jsx,.ts,.tsx,.css,.py,.java,.c,.cpp,.h,.hpp,.rb,.go,.rs,.swift,.kt"
                     multiple
                     className="hidden"
                 />

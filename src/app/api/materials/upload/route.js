@@ -4,6 +4,22 @@ import { Project, Material } from '@/models';
 import { connectDB, uploadFile, waitForFileProcessing, transcribeWithWhisper, isGroqConfigured, uploadToGridFS } from '@/utils/clients';
 
 /**
+ * Check if a filename indicates a text file based on extension
+ */
+function isTextFile(filename) {
+    const textExtensions = [
+        '.txt', '.md', '.markdown', '.json', '.csv', '.xml',
+        '.html', '.htm', '.js', '.jsx', '.ts', '.tsx', '.css',
+        '.py', '.java', '.c', '.cpp', '.h', '.hpp', '.rb',
+        '.go', '.rs', '.swift', '.kt', '.sh', '.bash', '.zsh',
+        '.yaml', '.yml', '.toml', '.ini', '.cfg', '.conf',
+        '.sql', '.graphql', '.vue', '.svelte'
+    ];
+    const lowerName = filename.toLowerCase();
+    return textExtensions.some(ext => lowerName.endsWith(ext));
+}
+
+/**
  * POST /api/materials/upload
  *
  * Upload a file material with optional transcription
@@ -210,6 +226,7 @@ export async function POST(request) {
             else if (isAudio) materialType = 'audio';
             else if (mimeType === 'application/pdf') materialType = 'pdf';
             else if (mimeType.startsWith('image/')) materialType = 'image';
+            else if (mimeType.startsWith('text/') || isTextFile(file.name)) materialType = 'text';
 
             // Create material
             const material = await Material.create({

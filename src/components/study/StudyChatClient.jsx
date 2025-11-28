@@ -162,11 +162,11 @@ export function StudyChatClient({ chatId, initialMessages = [] }) {
                     console.log('Request aborted');
                 } else {
                     console.error('Failed to send message:', error);
-                    // Update assistant message with error
+                    // Update assistant message with error flag
                     setMessages((prev) =>
                         prev.map((m) =>
                             m.id === assistantMessageId
-                                ? { ...m, content: 'Sorry, something went wrong. Please try again.' }
+                                ? { ...m, content: '', isError: true }
                                 : m
                         )
                     );
@@ -296,9 +296,8 @@ export function StudyChatClient({ chatId, initialMessages = [] }) {
                             m.id === assistantMessageId
                                 ? {
                                       ...m,
-                                      content:
-                                          m.content ||
-                                          'Sorry, something went wrong. Please try again.',
+                                      content: '',
+                                      isError: true,
                                   }
                                 : m
                         )
@@ -317,6 +316,21 @@ export function StudyChatClient({ chatId, initialMessages = [] }) {
         // Optionally handle question answer result
         console.log('Question answered:', result);
     }, []);
+
+    const handleRetry = useCallback(
+        (messageIndex) => {
+            // Find the user message before the failed assistant message
+            const userMessage = messages[messageIndex - 1];
+            if (!userMessage || userMessage.role !== 'user') return;
+
+            // Remove the failed assistant message
+            setMessages((prev) => prev.filter((_, i) => i !== messageIndex));
+
+            // Resend the user message
+            handleSend(userMessage.content, userMessage.attachments || []);
+        },
+        [messages, handleSend]
+    );
 
     // Empty state for new chat
     if (messages.length === 0 && !isStreaming) {
@@ -370,6 +384,7 @@ export function StudyChatClient({ chatId, initialMessages = [] }) {
                                 message.role === 'assistant'
                             }
                             onQuestionAnswer={handleQuestionAnswer}
+                            onRetry={message.isError ? () => handleRetry(index) : undefined}
                         />
                     ))}
                     <div ref={messagesEndRef} />
