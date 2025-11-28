@@ -1,6 +1,6 @@
 import { auth } from '@/auth';
 import { redirect } from 'next/navigation';
-import { getProject, getStudyChats, getStudyMemories } from '@/actions';
+import { getProject, getStudyChats, getStudyMemories, getStudyArtifacts } from '@/actions';
 import { StudyModeProvider } from '@/components/study';
 import { StudyChatSidebar } from '@/components/study/StudyChatSidebar';
 import { notFound } from 'next/navigation';
@@ -24,10 +24,11 @@ export default async function StudyModeLayout({ children, params }) {
 
     const { projectId } = await params;
 
-    const [projectResult, chatsResult, memoriesResult] = await Promise.all([
+    const [projectResult, chatsResult, memoriesResult, artifactsResult] = await Promise.all([
         getProject(projectId),
         getStudyChats(projectId),
         getStudyMemories(projectId),
+        getStudyArtifacts(projectId),
     ]);
 
     if (projectResult.error === 'Project not found') {
@@ -37,6 +38,7 @@ export default async function StudyModeLayout({ children, params }) {
     const project = projectResult.data;
     const chats = chatsResult.data || [];
     const memories = memoriesResult.data || [];
+    const artifacts = artifactsResult.data || [];
 
     return (
         <StudyModeProvider
@@ -44,6 +46,7 @@ export default async function StudyModeLayout({ children, params }) {
             project={project}
             initialChats={chats}
             initialMemories={memories}
+            initialArtifacts={artifacts}
         >
             <div className="h-screen flex flex-col bg-white">
                 {/* Minimal Header */}

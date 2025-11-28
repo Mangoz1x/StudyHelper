@@ -63,7 +63,15 @@ const ToolCallSchema = new mongoose.Schema(
         // Tool type
         type: {
             type: String,
-            enum: ['memory_create', 'memory_update', 'memory_delete', 'question_create'],
+            enum: [
+                'memory_create',
+                'memory_update',
+                'memory_delete',
+                'question_create',
+                'artifact_create',
+                'artifact_update',
+                'artifact_delete',
+            ],
             required: true,
         },
 
@@ -72,6 +80,36 @@ const ToolCallSchema = new mongoose.Schema(
 
         // Result from executing the tool
         result: mongoose.Schema.Types.Mixed,
+    },
+    { _id: false }
+);
+
+// Schema for artifact actions displayed in chat
+const ArtifactActionSchema = new mongoose.Schema(
+    {
+        // The artifact ID
+        artifactId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Artifact',
+            required: true,
+        },
+
+        // Action type
+        actionType: {
+            type: String,
+            enum: ['created', 'updated', 'deleted'],
+            required: true,
+        },
+
+        // Snapshot of artifact info at time of action (for display)
+        artifact: {
+            type: {
+                type: String,
+                enum: ['study_plan', 'lesson', 'flashcards'],
+            },
+            title: String,
+            description: String,
+        },
     },
     { _id: false }
 );
@@ -139,6 +177,9 @@ const StudyMessageSchema = new mongoose.Schema(
 
         // Tool calls made by assistant
         toolCalls: [ToolCallSchema],
+
+        // Artifact actions for display in chat (created/updated/deleted)
+        artifactActions: [ArtifactActionSchema],
 
         // Inline question (if this message contains one)
         inlineQuestion: InlineQuestionSchema,

@@ -6,6 +6,7 @@ import { BookOpen, Sparkles } from 'lucide-react';
 import { MessageBubble } from './MessageBubble';
 import { ChatInput } from './ChatInput';
 import { useStudyMode } from './StudyModeContext';
+import { ArtifactPanel } from './artifacts';
 
 /**
  * Study Chat Client Component
@@ -18,7 +19,18 @@ import { useStudyMode } from './StudyModeContext';
  */
 export function StudyChatClient({ chatId, initialMessages = [] }) {
     const router = useRouter();
-    const { projectId, project, addChat, updateChat, updateChatActivity, addMemory } = useStudyMode();
+    const {
+        projectId,
+        project,
+        addChat,
+        updateChat,
+        updateChatActivity,
+        addMemory,
+        addArtifact,
+        updateArtifact,
+        removeArtifact,
+        artifactPanelOpen,
+    } = useStudyMode();
 
     const [messages, setMessages] = useState(initialMessages);
     const [isStreaming, setIsStreaming] = useState(false);
@@ -289,6 +301,93 @@ export function StudyChatClient({ chatId, initialMessages = [] }) {
                     updateChat(event.chatId, { title: event.title });
                     break;
 
+                case 'artifacts_creating':
+                    // Show that artifacts are being created
+                    setMessages((prev) =>
+                        prev.map((m) =>
+                            m.id === assistantMessageId
+                                ? {
+                                      ...m,
+                                      artifactsCreating: event.count,
+                                  }
+                                : m
+                        )
+                    );
+                    break;
+
+                case 'artifact_created':
+                    // New artifact was created
+                    addArtifact({
+                        id: event.artifactId,
+                        ...event.artifact,
+                    });
+                    // Add artifact action to message for display and clear creating state
+                    setMessages((prev) =>
+                        prev.map((m) =>
+                            m.id === assistantMessageId
+                                ? {
+                                      ...m,
+                                      artifactsCreating: Math.max(0, (m.artifactsCreating || 1) - 1),
+                                      artifactActions: [
+                                          ...(m.artifactActions || []),
+                                          {
+                                              artifactId: event.artifactId,
+                                              actionType: 'created',
+                                              artifact: event.artifact,
+                                          },
+                                      ],
+                                  }
+                                : m
+                        )
+                    );
+                    break;
+
+                case 'artifact_updated':
+                    // Artifact was updated
+                    updateArtifact(event.artifactId, event.artifact);
+                    // Add artifact action to message for display
+                    setMessages((prev) =>
+                        prev.map((m) =>
+                            m.id === assistantMessageId
+                                ? {
+                                      ...m,
+                                      artifactActions: [
+                                          ...(m.artifactActions || []),
+                                          {
+                                              artifactId: event.artifactId,
+                                              actionType: 'updated',
+                                              artifact: event.artifact,
+                                          },
+                                      ],
+                                  }
+                                : m
+                        )
+                    );
+                    break;
+
+                case 'artifact_deleted':
+                    // Artifact was deleted
+                    removeArtifact(event.artifactId);
+                    // Add artifact action to message for display
+                    setMessages((prev) =>
+                        prev.map((m) =>
+                            m.id === assistantMessageId
+                                ? {
+                                      ...m,
+                                      artifactActions: [
+                                          ...(m.artifactActions || []),
+                                          {
+                                              artifactId: event.artifactId,
+                                              actionType: 'deleted',
+                                              artifact: { title: 'Deleted artifact' },
+                                          },
+                                      ],
+                                  }
+                                : m
+                        )
+                    );
+                    break;
+
                 case 'error':
                     console.error('Stream error:', event.message);
                     setMessages((prev) =>
@@ -309,7 +408,7 @@ export function StudyChatClient({ chatId, initialMessages = [] }) {
                     break;
             }
         },
-        [projectId, currentChatId, addChat, updateChat, updateChatActivity, addMemory]
+        [projectId, currentChatId, addChat, updateChat, updateChatActivity, addMemory, addArtifact, updateArtifact, removeArtifact]
     );
 
     const handleQuestionAnswer = useCallback((result) => {
@@ -370,29 +469,35 @@ export function StudyChatClient({ chatId, initialMessages = [] }) {
     }
 
     return (
-        <div className="flex-1 flex flex-col h-full bg-white">
-            {/* Messages area */}
-            <div className="flex-1 overflow-y-auto">
-                <div className="max-w-3xl mx-auto space-y-6 px-4 py-6 pb-4">
-                    {messages.map((message, index) => (
-                        <MessageBubble
-                            key={message.id || message._id || index}
-                            message={message}
-                            isStreaming={
-                                isStreaming &&
-                                index === messages.length - 1 &&
-                                message.role === 'assistant'
-                            }
-                            onQuestionAnswer={handleQuestionAnswer}
-                            onRetry={message.isError ? () => handleRetry(index) : undefined}
-                        />
-                    ))}
-                    <div ref={messagesEndRef} />
+        <div className="flex-1 flex h-full">
+            {/* Main chat area */}
+            <div className={`flex flex-col h-full bg-white transition-all ${artifactPanelOpen ? 'w-1/2' : 'w-full'}`}>
+                {/* Messages area */}
+                <div className="flex-1 overflow-y-auto">
+                    <div className={`mx-auto space-y-6 px-4 py-6 pb-4 ${artifactPanelOpen ? 'max-w-2xl' : 'max-w-3xl'}`}>
+                        {messages.map((message, index) => (
+                            <MessageBubble
+                                key={message.id || message._id || index}
+                                message={message}
+                                isStreaming={
+                                    isStreaming &&
+                                    index === messages.length - 1 &&
+                                    message.role === 'assistant'
+                                }
+                                onQuestionAnswer={handleQuestionAnswer}
+                                onRetry={message.isError ? () => handleRetry(index) : undefined}
+                            />
+                        ))}
+                        <div ref={messagesEndRef} />
+                    </div>
                 </div>
+
+                {/* Input area */}
+                <ChatInput onSend={handleSend} disabled={isStreaming} />
             </div>
 
-            {/* Input area */}
-            <ChatInput onSend={handleSend} disabled={isStreaming} />
+            {/* Artifact side panel */}
+            <ArtifactPanel />
         </div>
     );
 }

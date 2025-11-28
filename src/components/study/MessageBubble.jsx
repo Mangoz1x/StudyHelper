@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { User, Bot, Copy, Check, ChevronDown, ChevronUp, FileText, Film, FileAudio, Image as ImageIcon, RotateCcw, AlertCircle } from 'lucide-react';
+import { User, Bot, Copy, Check, ChevronDown, ChevronUp, FileText, Film, FileAudio, Image as ImageIcon, RotateCcw, AlertCircle, Loader2, Sparkles } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { InlineQuestion } from './InlineQuestion';
+import { ArtifactCard } from './artifacts';
 
 /**
  * Get icon for file type
@@ -200,6 +201,40 @@ export function AssistantMessage({ message, isStreaming = false, isError = false
                         {isStreaming && hasContent && (
                             <span className="inline-block w-2 h-4 bg-violet-500 animate-pulse ml-0.5" />
                         )}
+                    </div>
+                )}
+
+                {/* Artifact Creating Indicator */}
+                {message.artifactsCreating > 0 && (
+                    <div className="mt-3 p-4 rounded-xl border border-violet-200 bg-gradient-to-r from-violet-50 to-purple-50">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 rounded-lg bg-white shadow-sm">
+                                <Loader2 className="w-5 h-5 text-violet-600 animate-spin" />
+                            </div>
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <Sparkles className="w-4 h-4 text-violet-600" />
+                                    <span className="font-medium text-gray-900">
+                                        Creating {message.artifactsCreating === 1 ? 'artifact' : `${message.artifactsCreating} artifacts`}...
+                                    </span>
+                                </div>
+                                <p className="text-sm text-gray-500 mt-0.5">
+                                    Building your study materials
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Artifact Cards */}
+                {message.artifactActions && message.artifactActions.length > 0 && (
+                    <div className="mt-3 space-y-2">
+                        {message.artifactActions.map((action, idx) => (
+                            <ArtifactCard
+                                key={`${action.artifactId}-${idx}`}
+                                artifactAction={action}
+                            />
+                        ))}
                     </div>
                 )}
 

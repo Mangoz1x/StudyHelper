@@ -109,6 +109,7 @@ function updateMaterialsWithFreshUris(materials, geminiFileMap) {
  * @param {Array} options.messages - Chat history [{role, content, inlineQuestion?, attachments?}]
  * @param {Array} options.materials - Project materials with file references
  * @param {Array} options.memories - Project memories [{id, content, category}]
+ * @param {Array} options.artifacts - Project artifacts [{id, type, title, description, content}]
  * @param {string} options.projectName - Project name for context
  * @param {Array} options.chatFiles - Files uploaded with current message [{geminiUri, mimeType, name}]
  * @param {Function} options.onProgress - Streaming callback
@@ -118,6 +119,7 @@ export async function generateStudyChatResponse({
     messages,
     materials,
     memories,
+    artifacts = [],
     projectName,
     chatFiles = [],
     onProgress,
@@ -126,8 +128,8 @@ export async function generateStudyChatResponse({
         messageCount: messages.length,
         materialCount: materials.length,
         memoryCount: memories.length,
+        artifactCount: artifacts.length,
         chatFilesCount: chatFiles.length,
-        chatFiles: chatFiles.map(f => ({ name: f.name, geminiUri: f.geminiUri, mimeType: f.mimeType })),
     });
 
     // 1. Ensure all file-based materials have valid (non-expired) Gemini files
@@ -146,6 +148,7 @@ export async function generateStudyChatResponse({
         projectName,
         memories,
         materialNames: materials.map((m) => m.name),
+        artifacts,
     });
 
     // 5. Format conversation history

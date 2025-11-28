@@ -44,5 +44,6 @@ export {
     getStudyChat,
     getStudyMessages,
     getStudyMemories,
+    getStudyArtifacts,
     deleteStudyChat,
 } from './study';

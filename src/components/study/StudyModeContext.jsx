@@ -8,7 +8,9 @@ import { createContext, useContext, useState, useCallback } from 'react';
  * Provides shared state for the study mode interface:
  * - List of chats
  * - Project memories
+ * - Project artifacts
  * - Sidebar state
+ * - Artifact panel state
  * - Active chat tracking
  */
 
@@ -21,6 +23,7 @@ const StudyModeContext = createContext(null);
  * @param {React.ReactNode} props.children
  * @param {Array} props.initialChats - Initial list of chats
  * @param {Array} props.initialMemories - Initial list of memories
+ * @param {Array} props.initialArtifacts - Initial list of artifacts
  * @param {string} props.projectId - Project ID
  * @param {Object} props.project - Full project object
  */
@@ -28,12 +31,22 @@ export function StudyModeProvider({
     children,
     initialChats = [],
     initialMemories = [],
+    initialArtifacts = [],
     projectId,
     project,
 }) {
     const [chats, setChats] = useState(initialChats);
     const [memories, setMemories] = useState(initialMemories);
+    const [artifacts, setArtifacts] = useState(initialArtifacts);
     const [sidebarOpen, setSidebarOpen] = useState(false);
+
+    // Artifact panel state
+    const [artifactPanelOpen, setArtifactPanelOpen] = useState(false);
+    const [activeArtifactId, setActiveArtifactId] = useState(null);
+    const [openArtifactTabs, setOpenArtifactTabs] = useState([]); // Array of artifact IDs
+
+    // Text selection reference state
+    const [textReference, setTextReference] = useState(null); // { text, artifactId, artifactTitle }
 
     // Add a new chat to the list
     const addChat = useCallback((chat) => {
@@ -81,18 +94,115 @@ export function StudyModeProvider({
         setMemories((prev) => prev.filter((m) => m.id !== memoryId));
     }, []);
 
+    // Add a new artifact
+    const addArtifact = useCallback((artifact) => {
+        setArtifacts((prev) => [artifact, ...prev]);
+        // Open panel and add to tabs when artifact is created
+        setArtifactPanelOpen(true);
+        setOpenArtifactTabs((prev) =>
+            prev.includes(artifact.id) ? prev : [...prev, artifact.id]
+        );
+        setActiveArtifactId(artifact.id);
+    }, []);
+
+    // Update an artifact
+    const updateArtifact = useCallback((artifactId, updates) => {
+        setArtifacts((prev) =>
+            prev.map((a) => (a.id === artifactId ? { ...a, ...updates } : a))
+        );
+        // Switch to updated artifact tab if panel is open
+        if (artifactPanelOpen) {
+            setActiveArtifactId(artifactId);
+            setOpenArtifactTabs((prev) =>
+                prev.includes(artifactId) ? prev : [...prev, artifactId]
+            );
+        }
+    }, [artifactPanelOpen]);
+
+    // Remove an artifact from the list
+    const removeArtifact = useCallback((artifactId) => {
+        setArtifacts((prev) => prev.filter((a) => a.id !== artifactId));
+        setOpenArtifactTabs((prev) => prev.filter((id) => id !== artifactId));
+        // If we're removing the active tab, switch to another
+        setActiveArtifactId((prev) => {
+            if (prev === artifactId) {
+                const remaining = openArtifactTabs.filter((id) => id !== artifactId);
+                return remaining.length > 0 ? remaining[remaining.length - 1] : null;
+            }
+            return prev;
+        });
+    }, [openArtifactTabs]);
+
+    // Open artifact in panel
+    const openArtifact = useCallback((artifactId) => {
+        setArtifactPanelOpen(true);
+        setActiveArtifactId(artifactId);
+        setOpenArtifactTabs((prev) =>
+            prev.includes(artifactId) ? prev : [...prev, artifactId]
+        );
+    }, []);
+
+    // Close artifact tab
+    const closeArtifactTab = useCallback((artifactId) => {
+        setOpenArtifactTabs((prev) => prev.filter((id) => id !== artifactId));
+        // If we're closing the active tab, switch to another
+        setActiveArtifactId((prev) => {
+            if (prev === artifactId) {
+                const remaining = openArtifactTabs.filter((id) => id !== artifactId);
+                return remaining.length > 0 ? remaining[remaining.length - 1] : null;
+            }
+            return prev;
+        });
+        // Close panel if no tabs left
+        setOpenArtifactTabs((prev) => {
+            if (prev.filter((id) => id !== artifactId).length === 0) {
+                setArtifactPanelOpen(false);
+            }
+            return prev.filter((id) => id !== artifactId);
+        });
+    }, [openArtifactTabs]);
+
+    // Toggle artifact panel
+    const toggleArtifactPanel = useCallback(() => {
+        setArtifactPanelOpen((prev) => !prev);
+    }, []);
+
     // Toggle sidebar
     const toggleSidebar = useCallback(() => {
         setSidebarOpen((prev) => !prev);
+    }, []);
+
+    // Set text reference from artifact selection
+    const setReference = useCallback((text, artifactId, artifactTitle) => {
+        if (!text || text.trim().length === 0) {
+            setTextReference(null);
+            return;
+        }
+        setTextReference({
+            text: text.trim(),
+            artifactId,
+            artifactTitle,
+        });
+    }, []);
+
+    // Clear text reference
+    const clearReference = useCallback(() => {
+        setTextReference(null);
     }, []);
 
     const value = {
         // Data
         chats,
         memories,
+        artifacts,
         projectId,
         project,
         sidebarOpen,
+
+        // Artifact panel state
+        artifactPanelOpen,
+        activeArtifactId,
+        openArtifactTabs,
 
         // Chat actions
         addChat,
@@ -105,9 +215,24 @@ export function StudyModeProvider({
         updateMemory,
         removeMemory,
 
+        // Artifact actions
+        addArtifact,
+        updateArtifact,
+        removeArtifact,
+        openArtifact,
+        closeArtifactTab,
+        setActiveArtifactId,
+        toggleArtifactPanel,
+        setArtifactPanelOpen,
+
         // UI actions
         toggleSidebar,
         setSidebarOpen,
+
+        // Text reference
+        textReference,
+        setReference,
+        clearReference,
     };
 
     return (

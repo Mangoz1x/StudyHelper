@@ -1,7 +1,7 @@
 'use server';
 
 import { auth } from '@/auth';
-import { StudyChat, StudyMessage, StudyMemory } from '@/models';
+import { StudyChat, StudyMessage, StudyMemory, Artifact } from '@/models';
 import { connectDB } from '@/utils/clients';
 
 /**
@@ -204,6 +204,54 @@ export async function getStudyMemories(projectId) {
     } catch (error) {
         console.error('getStudyMemories error:', error);
         return { error: 'Failed to fetch memories' };
+    }
+}
+
+/**
+ * Get all artifacts for a project
+ *
+ * @param {string} projectId - The project ID
+ * @returns {Promise<{data?: Array, error?: string}>}
+ */
+export async function getStudyArtifacts(projectId) {
+    try {
+        const session = await auth();
+        if (!session?.user?.id) {
+            return { error: 'Unauthorized: Please sign in' };
+        }
+
+        if (!projectId) {
+            return { error: 'Project ID is required' };
+        }
+
+        await connectDB();
+
+        const artifacts = await Artifact.find({
+            projectId,
+            userId: session.user.id,
+            status: 'active',
+        })
+            .sort({ updatedAt: -1 })
+            .lean();
+
+        return {
+            data: artifacts.map((artifact) => ({
+                id: artifact._id.toString(),
+                chatId: artifact.chatId?.toString(),
+                type: artifact.type,
+                title: artifact.title,
+                description: artifact.description,
+                content: artifact.content,
+                status: artifact.status,
+                version: artifact.version,
+                lastEditedBy: artifact.lastEditedBy,
+                createdAt: artifact.createdAt?.toISOString?.() || artifact.createdAt,
+                updatedAt: artifact.updatedAt?.toISOString?.() || artifact.updatedAt,
+            })),
+        };
+    } catch (error) {
+        console.error('getStudyArtifacts error:', error);
+        return { error: 'Failed to fetch artifacts' };
     }
 }
 

@@ -1,9 +1,101 @@
 export const dynamic = 'force-dynamic';
 
 import { auth } from '@/auth';
-import { StudyChat, StudyMessage, StudyMemory, Material, Project } from '@/models';
+import { StudyChat, StudyMessage, StudyMemory, Material, Project, Artifact } from '@/models';
 import { connectDB, uploadFile, waitForFileProcessing } from '@/utils/clients';
 import { generateStudyChatResponse } from '@/utils/ai/studyChatGenerate';
+import { v4 as uuidv4 } from 'uuid';
+
+/**
+ * Normalize artifact content to fix common LLM schema mistakes
+ * For lessons, the LLM sometimes puts question type at section level instead of nesting
+ */
+function normalizeArtifactContent(type, content) {
+    if (!content) {
+        return {};
+    }
+
+    if (type === 'lesson' && content.sections) {
+        const normalizedSections = content.sections.map((section, idx) => {
+            // Ensure section has an ID
+            const sectionId = section.id || `section-${idx}-${uuidv4().slice(0, 8)}`;
+
+            // Check if section type is a question type (LLM mistake)
+            const questionTypes = ['multiple_choice', 'multiple_select', 'true_false', 'short_answer', 'fill_blank'];
+            if (questionTypes.includes(section.type)) {
+                // LLM put question type at section level - fix it
+                return {
+                    id: sectionId,
+                    type: 'question',
+                    question: {
+                        id: `q-${sectionId}`,
+                        type: section.type,
+                        question: section.question || section.content || '',
+                        options: section.options || [],
+                        correctAnswer: section.correctAnswer,
+                        explanation: section.explanation || '',
+                        hint: section.hint,
+                    },
+                };
+            }
+
+            // Normal case - section type is 'content' or 'question'
+            if (section.type === 'question') {
+                // Ensure question object exists and has an ID
+                const question = section.question || {};
+                return {
+                    id: sectionId,
+                    type: 'question',
+                    question: {
+                        id: question.id || `q-${sectionId}`,
+                        type: question.type || 'short_answer',
+                        question: question.question || '',
+                        options: question.options || [],
+                        correctAnswer: question.correctAnswer,
+                        explanation: question.explanation || '',
+                        hint: question.hint,
+                    },
+                };
+            }
+
+            // Content section
+            return {
+                id: sectionId,
+                type: 'content',
+                content: section.content || '',
+            };
+        });
+
+        return {
+            ...content,
+            sections: normalizedSections,
+        };
+    }
+
+    // For study_plan, ensure items have IDs
+    if (type === 'study_plan' && content.items) {
+        const normalizedItems = content.items.map((item, idx) => ({
+            ...item,
+            id: item.id || `item-${idx}-${uuidv4().slice(0, 8)}`,
+            children: (item.children || []).map((child, cidx) => ({
+                ...child,
+                id: child.id || `child-${idx}-${cidx}-${uuidv4().slice(0, 8)}`,
+            })),
+        }));
+        return { ...content, items: normalizedItems };
+    }
+
+    // For flashcards, ensure cards have IDs
+    if (type === 'flashcards' && content.cards) {
+        const normalizedCards = content.cards.map((card, idx) => ({
+            ...card,
+            id: card.id || `card-${idx}-${uuidv4().slice(0, 8)}`,
+        }));
+        return { ...content, cards: normalizedCards };
+    }
+
+    return content;
+}
 
 /**
  * GET /api/study/chats/[chatId]/messages
@@ -61,6 +153,7 @@ export async function GET(request, { params }) {
             content: msg.content,
             attachments: msg.attachments || [],
             toolCalls: msg.toolCalls || [],
+            artifactActions: msg.artifactActions || [],
             inlineQuestion: msg.inlineQuestion || null,
             metadata: msg.metadata || {},
             createdAt: msg.createdAt,
@@ -270,7 +363,7 @@ export async function POST(request, { params }) {
                     });
 
                     // 3. Load context
-                    const [chatHistory, materials, memories] = await Promise.all([
+                    const [chatHistory, materials, memories, artifacts] = await Promise.all([
                         // Get recent messages for context (last 50)
                         StudyMessage.find({ chatId: actualChatId })
                             .sort({ createdAt: -1 })
@@ -287,6 +380,12 @@ export async function POST(request, { params }) {
                             projectId: chat.projectId,
                             userId: session.user.id,
                             isActive: true,
+                        }).lean(),
+                        // Get active artifacts for this project
+                        Artifact.find({
+                            projectId: chat.projectId,
+                            userId: session.user.id,
+                            status: 'active',
                         }).lean(),
                     ]);
 
@@ -316,6 +415,13 @@ export async function POST(request, { params }) {
                             content: m.content,
                             category: m.category,
                         })),
+                        artifacts: artifacts.map((a) => ({
+                            id: a._id.toString(),
+                            type: a.type,
+                            title: a.title,
+                            description: a.description,
+                            content: a.content,
+                        })),
                         projectName: project.name,
                         chatFiles: uploadedFiles, // Include files uploaded with this message
                         onProgress: (progress) => {
@@ -328,10 +434,181 @@ export async function POST(request, { params }) {
 
                     // 5. Process tool calls
                     const processedToolCalls = [];
+                    const artifactActions = [];
                     let inlineQuestion = null;
 
+                    // Count artifact creations for progress
+                    const artifactCreations = (result.toolCalls || []).filter(tc => tc.type === 'artifact_create');
+                    if (artifactCreations.length > 0) {
+                        sendSSE(controller, encoder, 'artifacts_creating', {
+                            count: artifactCreations.length,
+                        });
+                    }
+
                     for (const tc of result.toolCalls || []) {
-                        if (tc.type === 'memory_create') {
+                        if (tc.type === 'artifact_create') {
+                            // Validate required fields
+                            const artifactType = tc.data.type;
+                            const artifactTitle = tc.data.title;
+
+                            if (!artifactType || !['study_plan', 'lesson', 'flashcards'].includes(artifactType)) {
+                                console.error('Invalid artifact type:', artifactType);
+                                continue; // Skip this tool call
+                            }
+
+                            if (!artifactTitle || typeof artifactTitle !== 'string') {
+                                console.error('Missing artifact title');
+                                continue; // Skip this tool call
+                            }
+
+                            // Normalize artifact content to fix common LLM mistakes
+                            const normalizedContent = normalizeArtifactContent(artifactType, tc.data.content || {});
+
+                            // Create a new artifact
+                            const artifact = await Artifact.create({
+                                projectId: chat.projectId,
+                                chatId: actualChatId,
+                                userId: session.user.id,
+                                type: artifactType,
+                                title: artifactTitle,
+                                description: tc.data.description || '',
+                                content: normalizedContent,
+                                status: 'active',
+                                sourceMessageId: assistantMessage._id,
+                            });
+
+                            const artifactData = {
+                                id: artifact._id.toString(),
+                                type: artifact.type,
+                                title: artifact.title,
+                                description: artifact.description,
+                                content: artifact.content,
+                                status: artifact.status,
+                            };
+
+                            const toolResult = { artifactId: artifact._id.toString() };
+                            processedToolCalls.push({ ...tc, result: toolResult });
+
+                            // Track artifact action for display in chat
+                            artifactActions.push({
+                                artifactId: artifact._id,
+                                actionType: 'created',
+                                artifact: {
+                                    type: artifact.type,
+                                    title: artifact.title,
+                                    description: artifact.description,
+                                },
+                            });
+
+                            sendSSE(controller, encoder, 'artifact_created', {
+                                artifactId: artifact._id.toString(),
+                                artifact: artifactData,
+                            });
+                        } else if (tc.type === 'artifact_update') {
+                            // Update existing artifact
+                            const artifact = await Artifact.findOne({
+                                _id: tc.data.artifactId,
+                                userId: session.user.id,
+                            });
+
+                            if (artifact) {
+                                const updateObj = {
+                                    $set: {
+                                        version: artifact.version + 1,
+                                        lastEditedBy: 'assistant',
+                                    },
+                                };
+
+                                // Apply updates based on artifact type
+                                const { updates } = tc.data;
+                                if (updates.title) updateObj.$set.title = updates.title;
+                                if (updates.description !== undefined)
+                                    updateObj.$set.description = updates.description;
+
+                                // Lesson section operations
+                                if (updates.addSections && artifact.type === 'lesson') {
+                                    updateObj.$push = { 'content.sections': { $each: updates.addSections } };
+                                }
+                                if (updates.removeSection && artifact.type === 'lesson') {
+                                    updateObj.$pull = { 'content.sections': { id: updates.removeSection } };
+                                }
+
+                                // Study plan item operations
+                                if (updates.addItems && artifact.type === 'study_plan') {
+                                    updateObj.$push = { 'content.items': { $each: updates.addItems } };
+                                }
+                                if (updates.removeItem && artifact.type === 'study_plan') {
+                                    updateObj.$pull = { 'content.items': { id: updates.removeItem } };
+                                }
+
+                                // Flashcard operations
+                                if (updates.addCards && artifact.type === 'flashcards') {
+                                    updateObj.$push = { 'content.cards': { $each: updates.addCards } };
+                                }
+                                if (updates.removeCard && artifact.type === 'flashcards') {
+                                    updateObj.$pull = { 'content.cards': { id: updates.removeCard } };
+                                }
+
+                                const updatedArtifact = await Artifact.findByIdAndUpdate(
+                                    tc.data.artifactId,
+                                    updateObj,
+                                    { new: true }
+                                ).lean();
+
+                                const toolResult = { success: true };
+                                processedToolCalls.push({ ...tc, result: toolResult });
+
+                                // Track artifact action for display in chat
+                                artifactActions.push({
+                                    artifactId: artifact._id,
+                                    actionType: 'updated',
+                                    artifact: {
+                                        type: updatedArtifact.type,
+                                        title: updatedArtifact.title,
+                                        description: updatedArtifact.description,
+                                    },
+                                });
+
+                                sendSSE(controller, encoder, 'artifact_updated', {
+                                    artifactId: tc.data.artifactId,
+                                    artifact: {
+                                        id: updatedArtifact._id.toString(),
+                                        type: updatedArtifact.type,
+                                        title: updatedArtifact.title,
+                                        description: updatedArtifact.description,
+                                        content: updatedArtifact.content,
+                                        status: updatedArtifact.status,
+                                    },
+                                });
+                            }
+                        } else if (tc.type === 'artifact_delete') {
+                            // Archive artifact
+                            const artifact = await Artifact.findOneAndUpdate(
+                                { _id: tc.data.artifactId, userId: session.user.id },
+                                { $set: { status: 'archived' } },
+                                { new: false } // Get old document for title
+                            );
+
+                            if (artifact) {
+                                const toolResult = { success: true };
+                                processedToolCalls.push({ ...tc, result: toolResult });
+
+                                // Track artifact action for display in chat
+                                artifactActions.push({
+                                    artifactId: artifact._id,
+                                    actionType: 'deleted',
+                                    artifact: {
+                                        type: artifact.type,
+                                        title: artifact.title,
+                                        description: artifact.description,
+                                    },
+                                });
+
+                                sendSSE(controller, encoder, 'artifact_deleted', {
+                                    artifactId: tc.data.artifactId,
+                                });
+                            }
+                        } else if (tc.type === 'memory_create') {
                             const memory = await StudyMemory.create({
                                 projectId: chat.projectId,
                                 userId: session.user.id,
@@ -388,6 +665,7 @@ export async function POST(request, { params }) {
                         {
                             content: result.content || '',
                             toolCalls: processedToolCalls,
+                            artifactActions: artifactActions.length > 0 ? artifactActions : undefined,
                             inlineQuestion,
                             metadata: {
                                 generationTimeMs,

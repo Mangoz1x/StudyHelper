@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Send, Loader2, Plus, Paperclip, X, FileText, Film, FileAudio, Image as ImageIcon } from 'lucide-react';
+import { Send, Loader2, Plus, Paperclip, X, FileText, Film, FileAudio, Image as ImageIcon, Quote } from 'lucide-react';
+import { useStudyMode } from './StudyModeContext';
 
 /**
  * Chat Input Component
@@ -18,6 +19,7 @@ export function ChatInput({
     disabled = false,
     placeholder = 'Ask anything...',
 }) {
+    const { textReference, clearReference } = useStudyMode();
     const [value, setValue] = useState('');
     const [showAttachMenu, setShowAttachMenu] = useState(false);
     const [attachments, setAttachments] = useState([]);
@@ -79,12 +81,21 @@ export function ChatInput({
         e?.preventDefault();
         const hasContent = value.trim().length > 0;
         const hasAttachments = attachments.length > 0;
+        const hasReference = !!textReference;
 
-        if ((!hasContent && !hasAttachments) || disabled) return;
+        if ((!hasContent && !hasAttachments && !hasReference) || disabled) return;
 
-        onSend?.(value.trim(), attachments);
+        // Include reference in message if present
+        let messageContent = value.trim();
+        if (textReference) {
+            const refPrefix = `[Referencing from "${textReference.artifactTitle}"]: "${textReference.text}"\n\n`;
+            messageContent = refPrefix + messageContent;
+        }
+
+        onSend?.(messageContent, attachments);
         setValue('');
         setAttachments([]);
+        clearReference();
 
         // Reset textarea height
         if (textareaRef.current) {
@@ -100,7 +111,7 @@ export function ChatInput({
         }
     };
 
-    const hasContent = value.trim().length > 0 || attachments.length > 0;
+    const hasContent = value.trim().length > 0 || attachments.length > 0 || !!textReference;
 
     return (
         <div className="p-4 bg-gradient-to-t from-white via-white to-transparent pt-6">
@@ -117,6 +128,32 @@ export function ChatInput({
 
                 <form onSubmit={handleSubmit}>
                     <div className="bg-gray-100 rounded-2xl border border-gray-200 focus-within:border-violet-300 focus-within:ring-2 focus-within:ring-violet-100 transition-all">
+                        {/* Text reference preview */}
+                        {textReference && (
+                            <div className="px-3 pt-3">
+                                <div className="relative group flex items-start gap-2 px-3 py-2 bg-violet-50 rounded-lg border border-violet-200 max-w-full">
+                                    <div className="w-8 h-8 rounded bg-violet-100 flex items-center justify-center flex-shrink-0">
+                                        <Quote className="w-4 h-4 text-violet-600" />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-xs font-medium text-violet-700 mb-0.5">
+                                            Referencing from {textReference.artifactTitle}
+                                        </p>
+                                        <p className="text-sm text-gray-700 line-clamp-2">
+                                            &ldquo;{textReference.text}&rdquo;
+                                        </p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={clearReference}
+                                        className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-gray-800 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                                    >
+                                        <X className="w-3 h-3 text-white" />
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Attachment previews */}
                         {attachments.length > 0 && (
                             <div className="px-3 pt-3 flex flex-wrap gap-2">

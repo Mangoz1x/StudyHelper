@@ -16,6 +16,10 @@ import {
     Check,
     Loader2,
     Brain,
+    FileText,
+    BookOpen,
+    ListChecks,
+    Layers,
 } from 'lucide-react';
 import { useStudyMode } from './StudyModeContext';
 import { MemoriesModal } from './MemoriesModal';
@@ -31,7 +35,7 @@ import { MemoriesModal } from './MemoriesModal';
 export function StudyChatSidebar({ activeChatId }) {
     const pathname = usePathname();
     const router = useRouter();
-    const { chats, memories, projectId, sidebarOpen, setSidebarOpen, removeChat, updateChat } = useStudyMode();
+    const { chats, memories, artifacts, projectId, sidebarOpen, setSidebarOpen, removeChat, updateChat, openArtifact } = useStudyMode();
 
     const [menuOpen, setMenuOpen] = useState(null);
     const [editingId, setEditingId] = useState(null);
@@ -135,6 +139,19 @@ export function StudyChatSidebar({ activeChatId }) {
         if (days === 1) return 'Yesterday';
         if (days < 7) return `${days} days ago`;
         return d.toLocaleDateString();
+    };
+
+    const getArtifactIcon = (type) => {
+        switch (type) {
+            case 'lesson':
+                return BookOpen;
+            case 'study_plan':
+                return ListChecks;
+            case 'flashcards':
+                return Layers;
+            default:
+                return FileText;
+        }
     };
 
     // Collapsed state
@@ -325,6 +342,41 @@ export function StudyChatSidebar({ activeChatId }) {
                         </div>
                     )}
                 </div>
+
+                {/* Artifacts Section */}
+                {artifacts.length > 0 && (
+                    <div className="px-3 py-2 border-t border-gray-200">
+                        <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider px-2 mb-2">
+                            Artifacts
+                        </h3>
+                        <div className="space-y-1">
+                            {artifacts.map((artifact) => {
+                                const artifactId = artifact.id || artifact._id;
+                                const ArtifactIcon = getArtifactIcon(artifact.type);
+
+                                return (
+                                    <button
+                                        key={artifactId}
+                                        onClick={() => openArtifact(artifactId.toString())}
+                                        className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-100 transition-colors text-left"
+                                    >
+                                        <div className="p-1.5 rounded bg-violet-100 flex-shrink-0">
+                                            <ArtifactIcon className="w-3.5 h-3.5 text-violet-600" />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-sm text-gray-700 truncate">
+                                                {artifact.title}
+                                            </p>
+                                            <p className="text-xs text-gray-400 capitalize">
+                                                {artifact.type?.replace('_', ' ')}
+                                            </p>
+                                        </div>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Memories Button */}

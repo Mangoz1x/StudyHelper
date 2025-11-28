@@ -24,3 +24,4 @@ export { AssessmentAttempt } from './AssessmentAttempt';
 export { StudyChat } from './StudyChat';
 export { StudyMessage } from './StudyMessage';
 export { StudyMemory } from './StudyMemory';
+export { Artifact } from './Artifact';

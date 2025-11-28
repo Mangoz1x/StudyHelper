@@ -91,6 +91,208 @@ export const STUDY_MODE_TOOLS = {
             hint: z.string().optional().describe('Optional hint the student can reveal'),
         }),
     },
+
+    // Artifact tools
+    artifact_create: {
+        name: 'artifact_create',
+        description:
+            'Create a rich, interactive study artifact. Use for structured content like lessons with embedded questions, study plans with checkable items, or flashcard sets. Artifacts appear in a side panel and can be revisited later.',
+        parameters: z.object({
+            type: z
+                .enum(['study_plan', 'lesson', 'flashcards'])
+                .describe('Type of artifact to create'),
+            title: z
+                .string()
+                .max(200)
+                .describe('Title of the artifact (e.g., "Chapter 3: Photosynthesis")'),
+            description: z
+                .string()
+                .max(500)
+                .optional()
+                .describe('Brief description of what this artifact covers'),
+            content: z
+                .object({
+                    // For study_plan
+                    items: z
+                        .array(
+                            z.object({
+                                id: z.string().describe('Unique ID for this item'),
+                                text: z.string().describe('The plan item text'),
+                                children: z
+                                    .array(
+                                        z.object({
+                                            id: z.string(),
+                                            text: z.string(),
+                                        })
+                                    )
+                                    .optional()
+                                    .describe('Optional nested sub-items'),
+                            })
+                        )
+                        .optional()
+                        .describe('For study_plan: array of checkable items'),
+
+                    // For lesson
+                    sections: z
+                        .array(
+                            z.object({
+                                id: z.string().describe('Unique ID for this section'),
+                                type: z.enum(['content', 'question']).describe('Section type'),
+                                content: z
+                                    .string()
+                                    .optional()
+                                    .describe('For content sections: markdown text'),
+                                question: z
+                                    .object({
+                                        type: z.enum([
+                                            'multiple_choice',
+                                            'true_false',
+                                            'short_answer',
+                                            'fill_blank',
+                                        ]),
+                                        question: z.string(),
+                                        options: z
+                                            .array(
+                                                z.object({
+                                                    id: z.string(),
+                                                    text: z.string(),
+                                                    isCorrect: z.boolean(),
+                                                })
+                                            )
+                                            .optional(),
+                                        correctAnswer: z.union([z.string(), z.array(z.string())]),
+                                        explanation: z.string(),
+                                        hint: z.string().optional(),
+                                    })
+                                    .optional()
+                                    .describe('For question sections: the quiz question'),
+                            })
+                        )
+                        .optional()
+                        .describe('For lesson: array of content and question sections'),
+
+                    // For flashcards
+                    cards: z
+                        .array(
+                            z.object({
+                                id: z.string().describe('Unique ID for this card'),
+                                front: z.string().describe('Front of the card (question/term)'),
+                                back: z.string().describe('Back of the card (answer/definition)'),
+                            })
+                        )
+                        .optional()
+                        .describe('For flashcards: array of front/back cards'),
+                })
+                .describe('Content of the artifact - structure depends on type'),
+        }),
+    },
+
+    artifact_update: {
+        name: 'artifact_update',
+        description:
+            'Update an existing artifact. Can add new sections/items, modify existing content, or update metadata.',
+        parameters: z.object({
+            artifactId: z.string().describe('ID of the artifact to update'),
+            updates: z.object({
+                title: z.string().max(200).optional().describe('New title'),
+                description: z.string().max(500).optional().describe('New description'),
+
+                // For lessons - section operations
+                addSections: z
+                    .array(
+                        z.object({
+                            id: z.string(),
+                            type: z.enum(['content', 'question']),
+                            content: z.string().optional(),
+                            question: z
+                                .object({
+                                    type: z.enum([
+                                        'multiple_choice',
+                                        'true_false',
+                                        'short_answer',
+                                        'fill_blank',
+                                    ]),
+                                    question: z.string(),
+                                    options: z
+                                        .array(
+                                            z.object({
+                                                id: z.string(),
+                                                text: z.string(),
+                                                isCorrect: z.boolean(),
+                                            })
+                                        )
+                                        .optional(),
+                                    correctAnswer: z.union([z.string(), z.array(z.string())]),
+                                    explanation: z.string(),
+                                    hint: z.string().optional(),
+                                })
+                                .optional(),
+                        })
+                    )
+                    .optional()
+                    .describe('Sections to add to a lesson'),
+                updateSection: z
+                    .object({
+                        sectionId: z.string(),
+                        content: z.string().optional(),
+                    })
+                    .optional()
+                    .describe('Update a specific section'),
+                removeSection: z.string().optional().describe('Section ID to remove'),
+
+                // For study plans - item operations
+                addItems: z
+                    .array(
+                        z.object({
+                            id: z.string(),
+                            text: z.string(),
+                            children: z
+                                .array(z.object({ id: z.string(), text: z.string() }))
+                                .optional(),
+                        })
+                    )
+                    .optional()
+                    .describe('Items to add to a study plan'),
+                updateItem: z
+                    .object({
+                        itemId: z.string(),
+                        text: z.string(),
+                    })
+                    .optional()
+                    .describe('Update a specific plan item'),
+                removeItem: z.string().optional().describe('Item ID to remove'),
+
+                // For flashcards - card operations
+                addCards: z
+                    .array(
+                        z.object({
+                            id: z.string(),
+                            front: z.string(),
+                            back: z.string(),
+                        })
+                    )
+                    .optional()
+                    .describe('Cards to add to a flashcard set'),
+                updateCard: z
+                    .object({
+                        cardId: z.string(),
+                        front: z.string().optional(),
+                        back: z.string().optional(),
+                    })
+                    .optional()
+                    .describe('Update a specific flashcard'),
+                removeCard: z.string().optional().describe('Card ID to remove'),
+            }),
+        }),
+    },
+
+    artifact_delete: {
+        name: 'artifact_delete',
+        description: 'Archive an artifact (soft delete). Use when an artifact is no longer needed.',
+        parameters: z.object({
+            artifactId: z.string().describe('ID of the artifact to archive'),
+        }),
+    },
 };
 
 /**
