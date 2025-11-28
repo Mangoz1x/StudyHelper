@@ -30,3 +30,9 @@ export {
     isSupportedMimeType,
     z,
 } from './gemini';
+
+// GROQ (Whisper transcription)
+export {
+    transcribeWithWhisper,
+    isGroqConfigured,
+} from './groq';

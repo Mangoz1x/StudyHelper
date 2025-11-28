@@ -81,13 +81,10 @@ function Nav() {
 function Hero() {
   const [mounted, setMounted] = useState(false);
 
-  // Use ref to track if component has mounted (null check pattern for React Compiler)
-  const mountedRef = useRef(null);
-  if (mountedRef.current == null) {
-    mountedRef.current = true;
-    // Trigger animation on next frame
+  useEffect(() => {
+    // Trigger animation on next frame after mount
     requestAnimationFrame(() => setMounted(true));
-  }
+  }, []);
 
   return (
     <section className="min-h-screen flex flex-col justify-center items-center px-6 bg-gradient-to-b from-blue-50 via-white to-white relative overflow-hidden">

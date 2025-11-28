@@ -3,6 +3,7 @@
 import { auth } from '@/auth';
 import { Project, Material } from '@/models';
 import { connectDB, uploadFile, waitForFileProcessing, deleteFile as deleteGeminiFile } from '@/utils/clients';
+import { getYouTubeTranscript, getYouTubeMetadata, extractYouTubeVideoId } from '@/utils/youtube';
 
 /**
  * Add a text material to a project
@@ -89,9 +90,10 @@ export async function addTextMaterial({ projectId, name, content, description, f
  * @param {string} data.url - YouTube URL
  * @param {string} [data.name] - Optional custom name
  * @param {string} [data.description] - Optional description
+ * @param {boolean} [data.transcriptOnly] - If true, only extract transcript instead of full video
  * @returns {Promise<{data?: Object, error?: string}>}
  */
-export async function addYouTubeMaterial({ projectId, url, name, description }) {
+export async function addYouTubeMaterial({ projectId, url, name, description, transcriptOnly = false }) {
     try {
         const session = await auth();
         if (!session?.user?.id) {
@@ -126,20 +128,135 @@ export async function addYouTubeMaterial({ projectId, url, name, description }) 
             .select('order');
         const order = (lastMaterial?.order ?? -1) + 1;
 
-        const material = await Material.create({
+        // Fetch video metadata
+        const metadata = await getYouTubeMetadata(videoId);
+        const videoTitle = name?.trim() || metadata?.title || `YouTube Video: ${videoId}`;
+
+        // Base material data
+        const materialData = {
             projectId,
             userId: session.user.id,
             type: 'youtube',
-            name: name?.trim() || `YouTube Video: ${videoId}`,
+            name: videoTitle,
             description: description?.trim(),
             youtube: {
                 videoId,
                 url: `https://www.youtube.com/watch?v=${videoId}`,
                 thumbnailUrl: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
+                duration: metadata?.duration,
+                transcriptOnly,
             },
-            status: 'ready',
             order,
-        });
+        };
+
+        // If transcript mode, extract the transcript
+        if (transcriptOnly) {
+            materialData.status = 'processing';
+            const material = await Material.create(materialData);
+
+            // Update project stats
+            await Project.updateOne(
+                { _id: projectId },
+                { $inc: { 'stats.materialCount': 1 } }
+            );
+
+            // Try to fetch transcript (async, don't block)
+            try {
+                const transcriptResult = await getYouTubeTranscript(videoId);
+
+                if (transcriptResult?.transcript) {
+                    await Material.updateOne(
+                        { _id: material._id },
+                        {
+                            $set: {
+                                status: 'ready',
+                                content: {
+                                    text: transcriptResult.transcript,
+                                    format: 'plain',
+                                    source: 'youtube_transcript',
+                                },
+                            },
+                        }
+                    );
+
+                    return {
+                        data: {
+                            id: material._id.toString(),
+                            type: material.type,
+                            name: material.name,
+                            description: material.description,
+                            youtube: materialData.youtube,
+                            content: {
+                                text: transcriptResult.transcript,
+                                format: 'plain',
+                                source: 'youtube_transcript',
+                            },
+                            status: 'ready',
+                            order: material.order,
+                            createdAt: material.createdAt?.toISOString?.() || material.createdAt,
+                        },
+                    };
+                } else {
+                    // No transcript available, fall back to full video mode
+                    await Material.updateOne(
+                        { _id: material._id },
+                        {
+                            $set: {
+                                status: 'ready',
+                                'youtube.transcriptOnly': false,
+                                processingError: 'No YouTube captions available. Using full video mode instead.',
+                            },
+                        }
+                    );
+
+                    return {
+                        data: {
+                            id: material._id.toString(),
+                            type: material.type,
+                            name: material.name,
+                            description: material.description,
+                            youtube: { ...materialData.youtube, transcriptOnly: false },
+                            status: 'ready',
+                            processingError: 'No YouTube captions available. Using full video mode instead.',
+                            order: material.order,
+                            createdAt: material.createdAt?.toISOString?.() || material.createdAt,
+                        },
+                    };
+                }
+            } catch (transcriptError) {
+                console.error('Transcript extraction failed:', transcriptError);
+
+                // Fall back to full video mode
+                await Material.updateOne(
+                    { _id: material._id },
+                    {
+                        $set: {
+                            status: 'ready',
+                            'youtube.transcriptOnly': false,
+                            processingError: 'Failed to extract transcript. Using full video mode instead.',
+                        },
+                    }
+                );
+
+                return {
+                    data: {
+                        id: material._id.toString(),
+                        type: material.type,
+                        name: material.name,
+                        description: material.description,
+                        youtube: { ...materialData.youtube, transcriptOnly: false },
+                        status: 'ready',
+                        processingError: 'Failed to extract transcript. Using full video mode instead.',
+                        order: material.order,
+                        createdAt: material.createdAt?.toISOString?.() || material.createdAt,
+                    },
+                };
+            }
+        }
+
+        // Full video mode (original behavior)
+        materialData.status = 'ready';
+        const material = await Material.create(materialData);
 
         // Update project stats
         await Project.updateOne(
@@ -426,19 +543,3 @@ export async function updateMaterialOrder(projectId, items) {
     }
 }
 
-// Helper function to extract YouTube video ID
-function extractYouTubeVideoId(url) {
-    const patterns = [
-        /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&?\s]+)/,
-        /youtube\.com\/shorts\/([^&?\s]+)/,
-    ];
-
-    for (const pattern of patterns) {
-        const match = url.match(pattern);
-        if (match) {
-            return match[1];
-        }
-    }
-
-    return null;
-}
