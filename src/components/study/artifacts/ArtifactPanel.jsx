@@ -1,6 +1,7 @@
 'use client';
 
-import { X, BookOpen, ListChecks, Layers } from 'lucide-react';
+import { useState } from 'react';
+import { X, BookOpen, ListChecks, Layers, Trash2 } from 'lucide-react';
 import { useStudyMode } from '../StudyModeContext';
 import { LessonArtifact } from './LessonArtifact';
 import { StudyPlanArtifact } from './StudyPlanArtifact';
@@ -37,7 +38,11 @@ export function ArtifactPanel() {
         setActiveArtifactId,
         closeArtifactTab,
         setArtifactPanelOpen,
+        removeArtifact,
     } = useStudyMode();
+
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
     if (!artifactPanelOpen || openArtifactTabs.length === 0) {
         return null;
@@ -51,8 +56,31 @@ export function ArtifactPanel() {
     // Get the active artifact
     const activeArtifact = artifacts.find((a) => a.id === activeArtifactId);
 
+    const handleDelete = async () => {
+        if (!activeArtifactId || isDeleting) return;
+
+        setIsDeleting(true);
+        try {
+            const res = await fetch(`/api/study/artifacts/${activeArtifactId}`, {
+                method: 'DELETE',
+            });
+
+            if (res.ok) {
+                removeArtifact(activeArtifactId);
+                setShowDeleteConfirm(false);
+            } else {
+                const data = await res.json();
+                console.error('Failed to delete artifact:', data.error);
+            }
+        } catch (error) {
+            console.error('Failed to delete artifact:', error);
+        } finally {
+            setIsDeleting(false);
+        }
+    };
+
     return (
-        <div className="w-1/2 border-l border-gray-200 flex flex-col bg-white">
+        <div className="w-1/2 border-l border-gray-200 flex flex-col bg-white relative">
             {/* Tabs header */}
             <div className="flex-shrink-0 border-b border-gray-200 bg-gray-50">
                 <div className="flex items-center overflow-x-auto">
@@ -87,8 +115,21 @@ export function ArtifactPanel() {
                         );
                     })}
 
-                    {/* Close panel button */}
-                    <div className="ml-auto flex-shrink-0 px-2">
+                    {/* Actions menu */}
+                    <div className="ml-auto flex-shrink-0 px-2 flex items-center gap-1">
+                        {/* Delete button */}
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setShowDeleteConfirm(true);
+                            }}
+                            className="p-1.5 hover:bg-red-100 rounded transition-colors group"
+                            title="Delete artifact"
+                        >
+                            <Trash2 className="w-4 h-4 text-gray-400 group-hover:text-red-600" />
+                        </button>
+
+                        {/* Close panel button */}
                         <button
                             onClick={() => setArtifactPanelOpen(false)}
                             className="p-1.5 hover:bg-gray-200 rounded transition-colors"
@@ -99,6 +140,36 @@ export function ArtifactPanel() {
                     </div>
                 </div>
             </div>
+
+            {/* Delete confirmation modal */}
+            {showDeleteConfirm && (
+                <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-xl p-6 max-w-md mx-4 shadow-xl">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                            Delete Artifact?
+                        </h3>
+                        <p className="text-gray-600 mb-4">
+                            Are you sure you want to delete &quot;{activeArtifact?.title}&quot;? This action cannot be undone.
+                        </p>
+                        <div className="flex gap-3 justify-end">
+                            <button
+                                onClick={() => setShowDeleteConfirm(false)}
+                                className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                                disabled={isDeleting}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleDelete}
+                                disabled={isDeleting}
+                                className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:opacity-50"
+                            >
+                                {isDeleting ? 'Deleting...' : 'Delete'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Content area */}
             <div className="flex-1 overflow-y-auto">

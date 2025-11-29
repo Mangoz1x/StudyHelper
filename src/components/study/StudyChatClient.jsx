@@ -225,6 +225,17 @@ export function StudyChatClient({ chatId, initialMessages = [] }) {
                     );
                     break;
 
+                case 'thinking':
+                    // Append thinking content to assistant message
+                    setMessages((prev) =>
+                        prev.map((m) =>
+                            m.id === assistantMessageId
+                                ? { ...m, thinking: (m.thinking || '') + event.content }
+                                : m
+                        )
+                    );
+                    break;
+
                 case 'content':
                     // Append text to assistant message
                     setMessages((prev) =>
@@ -278,7 +289,7 @@ export function StudyChatClient({ chatId, initialMessages = [] }) {
                     break;
 
                 case 'message_complete':
-                    // Update assistant message with final data
+                    // Update assistant message with final data and clear any stuck creating indicator
                     setMessages((prev) =>
                         prev.map((m) =>
                             m.id === assistantMessageId
@@ -286,6 +297,7 @@ export function StudyChatClient({ chatId, initialMessages = [] }) {
                                       ...m,
                                       id: event.messageId,
                                       _id: event.messageId,
+                                      artifactsCreating: 0, // Clear any stuck indicator
                                   }
                                 : m
                         )

@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { User, Bot, Copy, Check, ChevronDown, ChevronUp, FileText, Film, FileAudio, Image as ImageIcon, RotateCcw, AlertCircle, Loader2, Sparkles } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
+import { User, Bot, Copy, Check, ChevronDown, ChevronUp, FileText, Film, FileAudio, Image as ImageIcon, RotateCcw, AlertCircle, Loader2, Sparkles, Brain } from 'lucide-react';
+import { MarkdownContent } from './MarkdownContent';
 import { InlineQuestion } from './InlineQuestion';
 import { ArtifactCard } from './artifacts';
 
@@ -84,7 +84,7 @@ export function UserMessage({ message }) {
 
                 {/* Text content */}
                 {hasContent && (
-                    <div className="bg-blue-600 text-white rounded-2xl rounded-br-md px-4 py-3">
+                    <div className="bg-blue-600 text-white rounded-2xl rounded-br-md px-4 py-3 select-text">
                         <p className="whitespace-pre-wrap">{message.content}</p>
                     </div>
                 )}
@@ -116,6 +116,7 @@ export function UserMessage({ message }) {
 export function AssistantMessage({ message, isStreaming = false, isError = false, onRetry, onQuestionAnswer }) {
     const [copied, setCopied] = useState(false);
     const [showToolCalls, setShowToolCalls] = useState(false);
+    const [showThinking, setShowThinking] = useState(false);
 
     const handleCopy = async () => {
         try {
@@ -130,8 +131,11 @@ export function AssistantMessage({ message, isStreaming = false, isError = false
     const hasToolCalls = message.toolCalls && message.toolCalls.length > 0;
     const hasInlineQuestion = message.inlineQuestion;
     const hasContent = message.content && message.content.trim().length > 0;
+    const hasThinking = message.thinking && message.thinking.trim().length > 0;
     const isErrorMessage = isError || message.isError;
-    const showMessageBubble = hasContent || isStreaming || isErrorMessage;
+    // Only show the "Thinking..." placeholder if we're streaming but have no thinking content yet
+    const showStreamingPlaceholder = isStreaming && !hasContent && !hasThinking;
+    const showMessageBubble = hasContent || showStreamingPlaceholder || isErrorMessage;
 
     return (
         <div className="flex gap-3">
@@ -139,9 +143,40 @@ export function AssistantMessage({ message, isStreaming = false, isError = false
                 <Bot className="w-4 h-4 text-violet-600" />
             </div>
             <div className="flex-1 max-w-[85%]">
+                {/* Thinking preview - collapsible */}
+                {(hasThinking || (isStreaming && message.thinking)) && (
+                    <div className="mb-2">
+                        <button
+                            onClick={() => setShowThinking(!showThinking)}
+                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200 hover:bg-amber-100 transition-colors text-sm"
+                        >
+                            <Brain className="w-4 h-4 text-amber-600" />
+                            <span className="text-amber-700 font-medium">
+                                {isStreaming && !hasContent ? 'Thinking...' : 'View reasoning'}
+                            </span>
+                            {showThinking ? (
+                                <ChevronUp className="w-3 h-3 text-amber-600" />
+                            ) : (
+                                <ChevronDown className="w-3 h-3 text-amber-600" />
+                            )}
+                        </button>
+                        {showThinking && (
+                            <div className="mt-2 p-3 rounded-lg bg-amber-50 border border-amber-200 text-sm">
+                                <MarkdownContent content={message.thinking} variant="thinking" />
+                                {isStreaming && !hasContent && (
+                                    <div className="flex items-center gap-2 mt-2 text-amber-600">
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                        <span className="text-xs">Still thinking...</span>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 {/* Main content - only show bubble if there's content or streaming */}
                 {showMessageBubble && (
-                    <div className={`rounded-2xl rounded-bl-md px-4 py-3 ${isErrorMessage ? 'bg-red-50' : 'bg-gray-100'}`}>
+                    <div className={`rounded-2xl rounded-bl-md px-4 py-3 select-text ${isErrorMessage ? 'bg-red-50' : 'bg-gray-100'}`}>
                         {isErrorMessage ? (
                             <div className="flex items-center justify-between gap-3">
                                 <div className="flex items-center gap-2 text-red-600">
@@ -159,34 +194,8 @@ export function AssistantMessage({ message, isStreaming = false, isError = false
                                 )}
                             </div>
                         ) : hasContent ? (
-                            <div className="markdown-content text-gray-900">
-                                <ReactMarkdown
-                                    components={{
-                                        p: ({ children }) => <p className="mb-3 last:mb-0">{children}</p>,
-                                        h1: ({ children }) => <h1 className="text-xl font-bold mb-3 mt-4 first:mt-0">{children}</h1>,
-                                        h2: ({ children }) => <h2 className="text-lg font-bold mb-2 mt-4 first:mt-0">{children}</h2>,
-                                        h3: ({ children }) => <h3 className="text-base font-bold mb-2 mt-3 first:mt-0">{children}</h3>,
-                                        ul: ({ children }) => <ul className="list-disc list-inside mb-3 space-y-1">{children}</ul>,
-                                        ol: ({ children }) => <ol className="list-decimal list-inside mb-3 space-y-1">{children}</ol>,
-                                        li: ({ children }) => <li className="ml-2">{children}</li>,
-                                        strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
-                                        em: ({ children }) => <em className="italic">{children}</em>,
-                                        code: ({ inline, children }) =>
-                                            inline ? (
-                                                <code className="bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded text-sm font-mono">{children}</code>
-                                            ) : (
-                                                <code className="block bg-gray-800 text-gray-100 p-3 rounded-lg text-sm font-mono overflow-x-auto my-3">{children}</code>
-                                            ),
-                                        pre: ({ children }) => <pre className="bg-gray-800 text-gray-100 p-3 rounded-lg text-sm overflow-x-auto my-3">{children}</pre>,
-                                        blockquote: ({ children }) => <blockquote className="border-l-4 border-violet-300 pl-4 italic my-3 text-gray-600">{children}</blockquote>,
-                                        a: ({ href, children }) => <a href={href} className="text-violet-600 hover:underline" target="_blank" rel="noopener noreferrer">{children}</a>,
-                                        hr: () => <hr className="my-4 border-gray-300" />,
-                                    }}
-                                >
-                                    {message.content}
-                                </ReactMarkdown>
-                            </div>
-                        ) : isStreaming ? (
+                            <MarkdownContent content={message.content} variant="default" />
+                        ) : showStreamingPlaceholder ? (
                             <div className="flex items-center gap-2 text-gray-500">
                                 <div className="flex gap-1">
                                     <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />

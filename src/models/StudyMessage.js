@@ -19,7 +19,7 @@ const InlineQuestionSchema = new mongoose.Schema(
         // Question type
         type: {
             type: String,
-            enum: ['multiple_choice', 'multiple_select', 'true_false', 'short_answer', 'fill_blank'],
+            enum: ['multiple_choice', 'multiple_select', 'true_false', 'short_answer', 'long_answer', 'fill_blank'],
             required: true,
         },
 
@@ -69,6 +69,9 @@ const ToolCallSchema = new mongoose.Schema(
                 'memory_delete',
                 'question_create',
                 'artifact_create',
+                'artifact_create_study_plan',
+                'artifact_create_lesson',
+                'artifact_create_flashcards',
                 'artifact_update',
                 'artifact_delete',
             ],

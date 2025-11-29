@@ -157,39 +157,57 @@ export async function generateStudyChatResponse({
     // 6. Build the full prompt
     const fullPrompt = `${systemPrompt}\n\n---\n\nConversation:\n${formattedHistory}\n\nTutor:`;
 
-    // 7. Generate with streaming and tools
+    console.log('[StudyChatGenerate] Prompt size:', fullPrompt.length, 'characters');
+
+    // 7. Build function declarations for tools
+    const functionDeclarations = buildFunctionDeclarations();
+    console.log('[StudyChatGenerate] Function declarations:', functionDeclarations.length, 'tools');
+    console.log('[StudyChatGenerate] Tool names:', functionDeclarations.map(f => f.name).join(', '));
+
+    // 8. Generate with streaming and tools (with thinking enabled)
     try {
         const stream = await generateContent({
             prompt: fullPrompt,
             files,
             model: GEMINI_MODELS.PRO,
             thinkingLevel: THINKING_LEVELS.LOW,
+            includeThoughts: true, // Enable streaming thought summaries
             stream: true,
-            config: {
-                tools: [
-                    {
-                        functionDeclarations: buildFunctionDeclarations(),
-                    },
-                ],
-            },
+            tools: [{ functionDeclarations }],
         });
 
-        // 8. Process stream
+        // 9. Process stream
         let textBuffer = '';
+        let thinkingBuffer = '';
         const toolCalls = [];
 
         for await (const chunk of stream) {
+            // Log finish reason if present
+            const finishReason = chunk.candidates?.[0]?.finishReason;
+            if (finishReason && finishReason !== 'STOP') {
+                console.log('[StudyChatGenerate] Finish reason:', finishReason);
+            }
+
             const parts = chunk.candidates?.[0]?.content?.parts || [];
 
             for (const part of parts) {
-                // Handle text content
-                if (part.text) {
+                // Handle thinking content (thought summaries)
+                if (part.text && part.thought) {
+                    thinkingBuffer += part.text;
+                    onProgress?.({ type: 'thinking', content: part.text });
+                }
+                // Handle regular text content
+                else if (part.text) {
                     textBuffer += part.text;
                     onProgress?.({ type: 'content', content: part.text });
                 }
 
                 // Handle function calls
                 if (part.functionCall) {
+                    console.log('[StudyChatGenerate] Function call received:',
+                        part.functionCall.name,
+                        JSON.stringify(part.functionCall.args, null, 2)
+                    );
                     toolCalls.push({
                         type: part.functionCall.name,
                         data: part.functionCall.args,
@@ -204,8 +222,11 @@ export async function generateStudyChatResponse({
             }
         }
 
+        console.log('[StudyChatGenerate] Complete. Text length:', textBuffer.length, 'Thinking length:', thinkingBuffer.length, 'Tool calls:', toolCalls.length);
+
         return {
             content: textBuffer,
+            thinking: thinkingBuffer,
             toolCalls,
         };
     } catch (error) {

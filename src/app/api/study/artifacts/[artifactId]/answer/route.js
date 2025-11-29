@@ -1,6 +1,7 @@
 import { auth } from '@/auth';
 import { Artifact } from '@/models';
 import { connectDB } from '@/utils/clients';
+import { gradeAnswer } from '@/utils/ai/gradeAnswer';
 
 /**
  * POST /api/study/artifacts/[artifactId]/answer
@@ -59,9 +60,13 @@ export async function POST(request, { params }) {
             return Response.json({ error: 'Question already answered' }, { status: 400 });
         }
 
-        // Grade the answer (same logic as inline questions)
-        const { correctAnswer, type } = section.question;
+        // Grade the answer based on question type
+        const { correctAnswer, type, question: questionText, explanation } = section.question;
         let isCorrect = false;
+        let score = null;
+        let feedback = null;
+        let keyPointsHit = null;
+        let keyPointsMissed = null;
 
         switch (type) {
             case 'multiple_choice':
@@ -80,13 +85,25 @@ export async function POST(request, { params }) {
                 break;
 
             case 'short_answer':
-                if (typeof answer === 'string' && typeof correctAnswer === 'string') {
-                    isCorrect =
-                        answer.trim().toLowerCase() === correctAnswer.trim().toLowerCase();
-                } else if (typeof answer === 'string' && Array.isArray(correctAnswer)) {
-                    isCorrect = correctAnswer.some(
-                        (ca) => answer.trim().toLowerCase() === ca.trim().toLowerCase()
-                    );
+            case 'long_answer':
+                // Use AI grading for short and long answer questions
+                if (typeof answer === 'string' && answer.trim().length > 0) {
+                    const gradingResult = await gradeAnswer({
+                        question: questionText,
+                        studentAnswer: answer,
+                        correctAnswer: typeof correctAnswer === 'string'
+                            ? correctAnswer
+                            : Array.isArray(correctAnswer)
+                                ? correctAnswer.join(' OR ')
+                                : String(correctAnswer),
+                        questionType: type,
+                    });
+
+                    isCorrect = gradingResult.isCorrect;
+                    score = gradingResult.score;
+                    feedback = gradingResult.feedback;
+                    keyPointsHit = gradingResult.keyPointsHit;
+                    keyPointsMissed = gradingResult.keyPointsMissed;
                 }
                 break;
 
@@ -102,25 +119,49 @@ export async function POST(request, { params }) {
                 break;
         }
 
+        // Build update data
+        const updateData = {
+            [`content.sections.${sectionIndex}.question.userAnswer`]: answer,
+            [`content.sections.${sectionIndex}.question.answeredAt`]: new Date(),
+            [`content.sections.${sectionIndex}.question.isCorrect`]: isCorrect,
+        };
+
+        // Add AI grading data if available
+        if (score !== null) {
+            updateData[`content.sections.${sectionIndex}.question.score`] = score;
+        }
+        if (feedback !== null) {
+            updateData[`content.sections.${sectionIndex}.question.aiFeedback`] = feedback;
+        }
+        if (keyPointsHit !== null) {
+            updateData[`content.sections.${sectionIndex}.question.keyPointsHit`] = keyPointsHit;
+        }
+        if (keyPointsMissed !== null) {
+            updateData[`content.sections.${sectionIndex}.question.keyPointsMissed`] = keyPointsMissed;
+        }
+
         // Update the question with the answer
         await Artifact.updateOne(
             { _id: artifactId },
-            {
-                $set: {
-                    [`content.sections.${sectionIndex}.question.userAnswer`]: answer,
-                    [`content.sections.${sectionIndex}.question.answeredAt`]: new Date(),
-                    [`content.sections.${sectionIndex}.question.isCorrect`]: isCorrect,
-                },
-            }
+            { $set: updateData }
         );
 
-        return Response.json({
-            data: {
-                isCorrect,
-                correctAnswer,
-                explanation: section.question.explanation,
-            },
-        });
+        // Build response
+        const responseData = {
+            isCorrect,
+            correctAnswer,
+            explanation,
+        };
+
+        // Include AI grading details for short/long answers
+        if (score !== null) {
+            responseData.score = score;
+            responseData.feedback = feedback;
+            responseData.keyPointsHit = keyPointsHit;
+            responseData.keyPointsMissed = keyPointsMissed;
+        }
+
+        return Response.json({ data: responseData });
     } catch (error) {
         console.error('[Artifact Answer] POST error:', error);
         return Response.json({ error: error.message }, { status: 500 });

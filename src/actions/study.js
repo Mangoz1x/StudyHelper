@@ -152,10 +152,15 @@ export async function getStudyMessages(chatId, { limit = 50, cursor } = {}) {
                       }
                     : null,
                 toolCalls: msg.toolCalls?.map((tc) => ({
-                    name: tc.name,
-                    args: tc.args,
+                    name: tc.type || tc.name,
+                    args: tc.data || tc.args,
                     result: tc.result,
                 })),
+                artifactActions: msg.artifactActions?.map((action) => ({
+                    artifactId: action.artifactId?.toString(),
+                    actionType: action.actionType,
+                    artifact: action.artifact,
+                })) || [],
                 createdAt: msg.createdAt?.toISOString?.() || msg.createdAt,
             })),
         };

@@ -16,7 +16,7 @@ const EmbeddedQuestionSchema = new mongoose.Schema(
         },
         type: {
             type: String,
-            enum: ['multiple_choice', 'multiple_select', 'true_false', 'short_answer', 'fill_blank'],
+            enum: ['multiple_choice', 'multiple_select', 'true_false', 'short_answer', 'long_answer', 'fill_blank'],
             required: true,
         },
         question: {

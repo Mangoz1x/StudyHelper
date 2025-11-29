@@ -127,6 +127,7 @@ export const generateContent = async ({
     includeThoughts = false,
     mediaResolution,
     responseSchema,
+    tools,
     config = {},
     stream = false,
 }) => {
@@ -158,8 +159,9 @@ export const generateContent = async ({
     // Add text prompt
     contents.push({ text: prompt });
 
-    // Build config with Gemini 3 options
-    const generationConfig = { ...config };
+    // Build generation config - exclude tools as they go separately
+    const { tools: configTools, ...restConfig } = config;
+    const generationConfig = { ...restConfig };
 
     // Add thinking config
     if (thinkingLevel) {
@@ -181,20 +183,27 @@ export const generateContent = async ({
         generationConfig.responseSchema = z.toJSONSchema(responseSchema);
     }
 
+    // Merge tools from parameter and config
+    const allTools = tools || configTools;
+
+    // Build request options
+    const requestOptions = {
+        model,
+        contents,
+        config: generationConfig,
+    };
+
+    // Add tools if provided (for function calling)
+    if (allTools) {
+        requestOptions.config.tools = allTools;
+    }
+
     // Use streaming or non-streaming based on flag
     if (stream) {
-        const response = await ai.models.generateContentStream({
-            model,
-            contents,
-            config: generationConfig,
-        });
+        const response = await ai.models.generateContentStream(requestOptions);
         return response;
     } else {
-        const response = await ai.models.generateContent({
-            model,
-            contents,
-            config: generationConfig,
-        });
+        const response = await ai.models.generateContent(requestOptions);
         return response;
     }
 };

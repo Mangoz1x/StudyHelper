@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
-import ReactMarkdown from 'react-markdown';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { Question } from '@/components/assessments/Question';
 import { Button } from '@/components/ui';
 import { CheckCircle2, XCircle, Lightbulb, HelpCircle, SkipForward, BookOpen, Quote } from 'lucide-react';
 import { useStudyMode } from '../StudyModeContext';
+import { MarkdownContent } from '../MarkdownContent';
 
 /**
  * Lesson Artifact
@@ -20,27 +20,28 @@ export function LessonArtifact({ artifact }) {
     const [buttonPosition, setButtonPosition] = useState({ top: 0, left: 0 });
     const [selectedText, setSelectedText] = useState('');
 
+    // Use a small delay to allow the selection to complete before checking
     const handleMouseUp = useCallback(() => {
-        const selection = window.getSelection();
-        const text = selection?.toString().trim();
+        // Small delay to ensure selection is finalized
+        setTimeout(() => {
+            const selection = window.getSelection();
+            const text = selection?.toString().trim();
 
-        if (text && text.length > 0 && text.length <= 500) {
-            const range = selection.getRangeAt(0);
-            const rect = range.getBoundingClientRect();
-            const containerRect = containerRef.current?.getBoundingClientRect();
+            if (text && text.length > 0 && text.length <= 500) {
+                const range = selection.getRangeAt(0);
+                const rect = range.getBoundingClientRect();
+                const containerRect = containerRef.current?.getBoundingClientRect();
 
-            if (containerRect) {
-                setButtonPosition({
-                    top: rect.top - containerRect.top - 40,
-                    left: rect.left - containerRect.left + rect.width / 2,
-                });
-                setSelectedText(text);
-                setShowReferenceButton(true);
+                if (containerRect) {
+                    setButtonPosition({
+                        top: rect.top - containerRect.top - 40,
+                        left: rect.left - containerRect.left + rect.width / 2,
+                    });
+                    setSelectedText(text);
+                    setShowReferenceButton(true);
+                }
             }
-        } else {
-            setShowReferenceButton(false);
-            setSelectedText('');
-        }
+        }, 10);
     }, []);
 
     const handleReference = useCallback(() => {
@@ -52,18 +53,33 @@ export function LessonArtifact({ artifact }) {
         }
     }, [selectedText, artifact.id, artifact.title, setReference]);
 
-    // Hide button when clicking elsewhere
-    const handleMouseDown = useCallback((e) => {
-        if (e.target.closest('.reference-button')) return;
-        setShowReferenceButton(false);
+    // Hide button only when clicking outside the selection area
+    // Don't interfere with the selection process itself
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            // Don't hide if clicking the reference button
+            if (e.target.closest('.reference-button')) return;
+
+            // Check if there's an active selection
+            const selection = window.getSelection();
+            const text = selection?.toString().trim();
+
+            // Only hide if there's no selection (user clicked to deselect)
+            if (!text) {
+                setShowReferenceButton(false);
+                setSelectedText('');
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
     return (
         <div
             ref={containerRef}
-            className="p-6 relative"
+            className="p-6 relative select-text"
             onMouseUp={handleMouseUp}
-            onMouseDown={handleMouseDown}
         >
             {/* Reference selection button */}
             {showReferenceButton && (
@@ -117,31 +133,7 @@ function LessonSection({ section, sectionIndex, artifactId }) {
     if (section.type === 'content') {
         return (
             <div className="prose prose-violet max-w-none">
-                <ReactMarkdown
-                    components={{
-                        p: ({ children }) => <p className="mb-4 last:mb-0 text-gray-700 leading-relaxed">{children}</p>,
-                        h1: ({ children }) => <h1 className="text-xl font-bold text-gray-900 mb-3 mt-6 first:mt-0">{children}</h1>,
-                        h2: ({ children }) => <h2 className="text-lg font-bold text-gray-900 mb-2 mt-5 first:mt-0">{children}</h2>,
-                        h3: ({ children }) => <h3 className="text-base font-bold text-gray-900 mb-2 mt-4 first:mt-0">{children}</h3>,
-                        ul: ({ children }) => <ul className="list-disc list-inside mb-4 space-y-1 text-gray-700">{children}</ul>,
-                        ol: ({ children }) => <ol className="list-decimal list-inside mb-4 space-y-1 text-gray-700">{children}</ol>,
-                        li: ({ children }) => <li className="ml-2">{children}</li>,
-                        strong: ({ children }) => <strong className="font-semibold text-gray-900">{children}</strong>,
-                        em: ({ children }) => <em className="italic">{children}</em>,
-                        code: ({ inline, children }) =>
-                            inline ? (
-                                <code className="bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded text-sm font-mono">{children}</code>
-                            ) : (
-                                <code className="block bg-gray-800 text-gray-100 p-3 rounded-lg text-sm font-mono overflow-x-auto my-3">{children}</code>
-                            ),
-                        pre: ({ children }) => <pre className="bg-gray-800 text-gray-100 p-3 rounded-lg text-sm overflow-x-auto my-3">{children}</pre>,
-                        blockquote: ({ children }) => <blockquote className="border-l-4 border-violet-300 pl-4 italic my-4 text-gray-600">{children}</blockquote>,
-                        a: ({ href, children }) => <a href={href} className="text-violet-600 hover:underline" target="_blank" rel="noopener noreferrer">{children}</a>,
-                        hr: () => <hr className="my-6 border-gray-200" />,
-                    }}
-                >
-                    {section.content || ''}
-                </ReactMarkdown>
+                <MarkdownContent content={section.content || ''} variant="default" />
             </div>
         );
     }
@@ -246,8 +238,12 @@ function EmbeddedQuestion({ question, sectionId, artifactId }) {
         multiple_select: 'Select All',
         true_false: 'True / False',
         short_answer: 'Short Answer',
+        long_answer: 'Long Answer',
         fill_blank: 'Fill in the Blank',
     };
+
+    // Check if this is an AI-graded question type
+    const isAIGraded = question.type === 'short_answer' || question.type === 'long_answer';
 
     return (
         <div className="bg-violet-50 rounded-xl p-4 border border-violet-200">
@@ -332,19 +328,76 @@ function EmbeddedQuestion({ question, sectionId, artifactId }) {
                         ) : result.isCorrect ? (
                             <>
                                 <CheckCircle2 className="w-5 h-5 text-green-600" />
-                                <span className="font-medium text-green-700">Correct!</span>
+                                <span className="font-medium text-green-700">
+                                    {result.score !== undefined ? `Great! Score: ${result.score}/100` : 'Correct!'}
+                                </span>
                             </>
                         ) : (
                             <>
                                 <XCircle className="w-5 h-5 text-amber-600" />
-                                <span className="font-medium text-amber-700">Not quite</span>
+                                <span className="font-medium text-amber-700">
+                                    {result.score !== undefined ? `Score: ${result.score}/100` : 'Not quite'}
+                                </span>
                             </>
                         )}
                     </div>
-                    {result.explanation && (
+
+                    {/* AI Feedback for short/long answers */}
+                    {result.feedback && (
+                        <div className="mt-2 space-y-2">
+                            <p className="text-sm text-gray-700">{result.feedback}</p>
+
+                            {/* Key points hit */}
+                            {result.keyPointsHit && result.keyPointsHit.length > 0 && (
+                                <div className="mt-2">
+                                    <p className="text-xs font-medium text-green-700 mb-1">What you got right:</p>
+                                    <ul className="text-xs text-green-600 space-y-0.5">
+                                        {result.keyPointsHit.map((point, i) => (
+                                            <li key={i} className="flex items-start gap-1">
+                                                <CheckCircle2 className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                                                <span>{point}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+
+                            {/* Key points missed */}
+                            {result.keyPointsMissed && result.keyPointsMissed.length > 0 && (
+                                <div className="mt-2">
+                                    <p className="text-xs font-medium text-amber-700 mb-1">Areas to improve:</p>
+                                    <ul className="text-xs text-amber-600 space-y-0.5">
+                                        {result.keyPointsMissed.map((point, i) => (
+                                            <li key={i} className="flex items-start gap-1">
+                                                <XCircle className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                                                <span>{point}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Standard explanation (for non-AI graded) */}
+                    {!result.feedback && result.explanation && (
                         <p className="text-sm text-gray-700 mt-1">{result.explanation}</p>
                     )}
-                    {!result.isCorrect && !result.skipped && result.correctAnswer && (
+
+                    {/* Model answer for AI-graded questions */}
+                    {isAIGraded && !result.skipped && result.correctAnswer && (
+                        <div className="mt-3 pt-3 border-t border-gray-200">
+                            <p className="text-xs font-medium text-gray-600 mb-1">Model answer:</p>
+                            <p className="text-sm text-gray-700">
+                                {Array.isArray(result.correctAnswer)
+                                    ? result.correctAnswer.join(' OR ')
+                                    : result.correctAnswer}
+                            </p>
+                        </div>
+                    )}
+
+                    {/* Correct answer for non-AI graded questions */}
+                    {!isAIGraded && !result.isCorrect && !result.skipped && result.correctAnswer && (
                         <p className="text-sm text-gray-600 mt-2">
                             <span className="font-medium">Correct answer:</span>{' '}
                             {Array.isArray(result.correctAnswer)

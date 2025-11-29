@@ -5,6 +5,14 @@ import { StudyChat, StudyMessage, StudyMemory, Material, Project, Artifact } fro
 import { connectDB, uploadFile, waitForFileProcessing } from '@/utils/clients';
 import { generateStudyChatResponse } from '@/utils/ai/studyChatGenerate';
 import { v4 as uuidv4 } from 'uuid';
+import mongoose from 'mongoose';
+
+/**
+ * Check if a string is a valid MongoDB ObjectId
+ */
+function isValidObjectId(id) {
+    return mongoose.Types.ObjectId.isValid(id) && String(new mongoose.Types.ObjectId(id)) === id;
+}
 
 /**
  * Normalize artifact content to fix common LLM schema mistakes
@@ -21,7 +29,7 @@ function normalizeArtifactContent(type, content) {
             const sectionId = section.id || `section-${idx}-${uuidv4().slice(0, 8)}`;
 
             // Check if section type is a question type (LLM mistake)
-            const questionTypes = ['multiple_choice', 'multiple_select', 'true_false', 'short_answer', 'fill_blank'];
+            const questionTypes = ['multiple_choice', 'multiple_select', 'true_false', 'short_answer', 'long_answer', 'fill_blank'];
             if (questionTypes.includes(section.type)) {
                 // LLM put question type at section level - fix it
                 return {
@@ -427,6 +435,8 @@ export async function POST(request, { params }) {
                         onProgress: (progress) => {
                             if (progress.type === 'content') {
                                 sendSSE(controller, encoder, 'content', { content: progress.content });
+                            } else if (progress.type === 'thinking') {
+                                sendSSE(controller, encoder, 'thinking', { content: progress.content });
                             }
                         },
                     });
@@ -437,8 +447,13 @@ export async function POST(request, { params }) {
                     const artifactActions = [];
                     let inlineQuestion = null;
 
-                    // Count artifact creations for progress
-                    const artifactCreations = (result.toolCalls || []).filter(tc => tc.type === 'artifact_create');
+                    // Count artifact creations for progress (check both old and new tool names)
+                    const artifactCreations = (result.toolCalls || []).filter(tc =>
+                        tc.type === 'artifact_create' ||
+                        tc.type === 'artifact_create_study_plan' ||
+                        tc.type === 'artifact_create_lesson' ||
+                        tc.type === 'artifact_create_flashcards'
+                    );
                     if (artifactCreations.length > 0) {
                         sendSSE(controller, encoder, 'artifacts_creating', {
                             count: artifactCreations.length,
@@ -446,23 +461,107 @@ export async function POST(request, { params }) {
                     }
 
                     for (const tc of result.toolCalls || []) {
-                        if (tc.type === 'artifact_create') {
-                            // Validate required fields
-                            const artifactType = tc.data.type;
-                            const artifactTitle = tc.data.title;
+                        // Debug log to see tool call structure
+                        console.log('[Tool Call]', tc.type, JSON.stringify(tc.data, null, 2));
 
-                            if (!artifactType || !['study_plan', 'lesson', 'flashcards'].includes(artifactType)) {
-                                console.error('Invalid artifact type:', artifactType);
-                                continue; // Skip this tool call
+                        // Handle new separated artifact tools
+                        if (tc.type === 'artifact_create_study_plan' ||
+                            tc.type === 'artifact_create_lesson' ||
+                            tc.type === 'artifact_create_flashcards') {
+                            // Extract type from tool name
+                            const artifactType = tc.type.replace('artifact_create_', '');
+                            const artifactTitle = tc.data?.title;
+                            const artifactDescription = tc.data?.description;
+
+                            // Content is now at top level based on type
+                            let artifactContent = {};
+                            if (artifactType === 'study_plan') {
+                                artifactContent = { items: tc.data?.items || [] };
+                            } else if (artifactType === 'lesson') {
+                                artifactContent = { sections: tc.data?.sections || [] };
+                            } else if (artifactType === 'flashcards') {
+                                artifactContent = { cards: tc.data?.cards || [] };
                             }
 
                             if (!artifactTitle || typeof artifactTitle !== 'string') {
-                                console.error('Missing artifact title');
-                                continue; // Skip this tool call
+                                console.error('Missing artifact title, Full data:', JSON.stringify(tc.data));
+                                continue;
+                            }
+
+                            // Normalize artifact content to fix any remaining issues
+                            const normalizedContent = normalizeArtifactContent(artifactType, artifactContent);
+
+                            // Create the artifact
+                            const artifact = await Artifact.create({
+                                projectId: chat.projectId,
+                                chatId: actualChatId,
+                                userId: session.user.id,
+                                type: artifactType,
+                                title: artifactTitle,
+                                description: artifactDescription || '',
+                                content: normalizedContent,
+                                status: 'active',
+                                sourceMessageId: assistantMessage._id,
+                            });
+
+                            const artifactData = {
+                                id: artifact._id.toString(),
+                                type: artifact.type,
+                                title: artifact.title,
+                                description: artifact.description,
+                                content: artifact.content,
+                                status: artifact.status,
+                            };
+
+                            const toolResult = { artifactId: artifact._id.toString() };
+                            processedToolCalls.push({ ...tc, result: toolResult });
+
+                            artifactActions.push({
+                                artifactId: artifact._id,
+                                actionType: 'created',
+                                artifact: {
+                                    type: artifact.type,
+                                    title: artifact.title,
+                                    description: artifact.description,
+                                },
+                            });
+
+                            sendSSE(controller, encoder, 'artifact_created', {
+                                artifactId: artifact._id.toString(),
+                                artifact: artifactData,
+                            });
+                        } else if (tc.type === 'artifact_create') {
+                            // Handle old unified artifact_create tool (backwards compatibility)
+                            let artifactType = tc.data?.type;
+                            let artifactTitle = tc.data?.title;
+                            let artifactDescription = tc.data?.description;
+                            let artifactContent = tc.data?.content || {};
+
+                            // Check if type/title are nested inside content (common LLM mistake)
+                            if (!artifactType && artifactContent?.type) {
+                                console.log('[Artifact] Fixing nested structure - type/title inside content');
+                                artifactType = artifactContent.type;
+                                artifactTitle = artifactContent.title || artifactTitle;
+                                artifactDescription = artifactContent.description || artifactDescription;
+                                artifactContent = {
+                                    sections: artifactContent.sections,
+                                    items: artifactContent.items,
+                                    cards: artifactContent.cards,
+                                };
+                            }
+
+                            if (!artifactType || !['study_plan', 'lesson', 'flashcards'].includes(artifactType)) {
+                                console.error('Invalid artifact type:', artifactType, 'Full data:', JSON.stringify(tc.data));
+                                continue;
+                            }
+
+                            if (!artifactTitle || typeof artifactTitle !== 'string') {
+                                console.error('Missing artifact title, Full data:', JSON.stringify(tc.data));
+                                continue;
                             }
 
                             // Normalize artifact content to fix common LLM mistakes
-                            const normalizedContent = normalizeArtifactContent(artifactType, tc.data.content || {});
+                            const normalizedContent = normalizeArtifactContent(artifactType, artifactContent);
 
                             // Create a new artifact
                             const artifact = await Artifact.create({
@@ -471,7 +570,7 @@ export async function POST(request, { params }) {
                                 userId: session.user.id,
                                 type: artifactType,
                                 title: artifactTitle,
-                                description: tc.data.description || '',
+                                description: artifactDescription || '',
                                 content: normalizedContent,
                                 status: 'active',
                                 sourceMessageId: assistantMessage._id,
@@ -505,6 +604,11 @@ export async function POST(request, { params }) {
                                 artifact: artifactData,
                             });
                         } else if (tc.type === 'artifact_update') {
+                            // Validate artifactId is a valid ObjectId
+                            if (!isValidObjectId(tc.data.artifactId)) {
+                                console.warn('[Artifact Update] Invalid ObjectId:', tc.data.artifactId);
+                                continue;
+                            }
                             // Update existing artifact
                             const artifact = await Artifact.findOne({
                                 _id: tc.data.artifactId,
@@ -582,6 +686,11 @@ export async function POST(request, { params }) {
                                 });
                             }
                         } else if (tc.type === 'artifact_delete') {
+                            // Validate artifactId is a valid ObjectId
+                            if (!isValidObjectId(tc.data.artifactId)) {
+                                console.warn('[Artifact Delete] Invalid ObjectId:', tc.data.artifactId);
+                                continue;
+                            }
                             // Archive artifact
                             const artifact = await Artifact.findOneAndUpdate(
                                 { _id: tc.data.artifactId, userId: session.user.id },
@@ -625,6 +734,11 @@ export async function POST(request, { params }) {
                                 result: toolResult,
                             });
                         } else if (tc.type === 'memory_update') {
+                            // Validate memoryId is a valid ObjectId
+                            if (!isValidObjectId(tc.data.memoryId)) {
+                                console.warn('[Memory Update] Invalid ObjectId:', tc.data.memoryId);
+                                continue;
+                            }
                             await StudyMemory.updateOne(
                                 { _id: tc.data.memoryId, userId: session.user.id },
                                 { content: tc.data.content }
@@ -635,6 +749,11 @@ export async function POST(request, { params }) {
                                 data: tc.data,
                             });
                         } else if (tc.type === 'memory_delete') {
+                            // Validate memoryId is a valid ObjectId
+                            if (!isValidObjectId(tc.data.memoryId)) {
+                                console.warn('[Memory Delete] Invalid ObjectId:', tc.data.memoryId);
+                                continue;
+                            }
                             await StudyMemory.updateOne(
                                 { _id: tc.data.memoryId, userId: session.user.id },
                                 { isActive: false }

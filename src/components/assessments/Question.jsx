@@ -1,6 +1,7 @@
 'use client';
 
 import { CheckCircle2, AlertCircle } from 'lucide-react';
+import { MarkdownContent } from '@/components/study/MarkdownContent';
 
 /**
  * Question Component - Renders different question types
@@ -233,9 +234,9 @@ export function Question({
                     </span>
                 )}
                 <div className="flex-1">
-                    <p className={`${compact ? 'text-base' : 'text-lg'} text-gray-900 font-medium`}>
-                        {question.question}
-                    </p>
+                    <div className={`${compact ? 'text-base' : 'text-lg'} text-gray-900 font-medium`}>
+                        <MarkdownContent content={question.question} variant="compact" />
+                    </div>
                     {!hideHint && question.hint && (
                         <p className="mt-2 text-sm text-gray-500 italic">Hint: {question.hint}</p>
                     )}

@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { useStudyMode } from './StudyModeContext';
 import { MemoriesModal } from './MemoriesModal';
+import { DeleteArtifactModal } from './DeleteArtifactModal';
 
 /**
  * Study Chat Sidebar
@@ -42,6 +43,7 @@ export function StudyChatSidebar({ activeChatId }) {
     const [editTitle, setEditTitle] = useState('');
     const [loading, setLoading] = useState(null);
     const [memoriesModalOpen, setMemoriesModalOpen] = useState(false);
+    const [deleteArtifact, setDeleteArtifact] = useState(null);
 
     const handleNewChat = () => {
         router.push(`/study/${projectId}`);
@@ -355,23 +357,37 @@ export function StudyChatSidebar({ activeChatId }) {
                                 const ArtifactIcon = getArtifactIcon(artifact.type);
 
                                 return (
-                                    <button
+                                    <div
                                         key={artifactId}
-                                        onClick={() => openArtifact(artifactId.toString())}
-                                        className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-100 transition-colors text-left"
+                                        className="group flex items-center gap-1 rounded-lg hover:bg-gray-100 transition-colors"
                                     >
-                                        <div className="p-1.5 rounded bg-violet-100 flex-shrink-0">
-                                            <ArtifactIcon className="w-3.5 h-3.5 text-violet-600" />
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-sm text-gray-700 truncate">
-                                                {artifact.title}
-                                            </p>
-                                            <p className="text-xs text-gray-400 capitalize">
-                                                {artifact.type?.replace('_', ' ')}
-                                            </p>
-                                        </div>
-                                    </button>
+                                        <button
+                                            onClick={() => openArtifact(artifactId.toString())}
+                                            className="flex-1 flex items-center gap-3 p-2 text-left min-w-0"
+                                        >
+                                            <div className="p-1.5 rounded bg-violet-100 flex-shrink-0">
+                                                <ArtifactIcon className="w-3.5 h-3.5 text-violet-600" />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm text-gray-700 truncate">
+                                                    {artifact.title}
+                                                </p>
+                                                <p className="text-xs text-gray-400 capitalize">
+                                                    {artifact.type?.replace('_', ' ')}
+                                                </p>
+                                            </div>
+                                        </button>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setDeleteArtifact(artifact);
+                                            }}
+                                            className="p-1.5 mr-1 rounded opacity-0 group-hover:opacity-100 hover:bg-red-100 transition-all"
+                                            title="Delete artifact"
+                                        >
+                                            <Trash2 className="w-3.5 h-3.5 text-gray-400 hover:text-red-600" />
+                                        </button>
+                                    </div>
                                 );
                             })}
                         </div>
@@ -401,6 +417,13 @@ export function StudyChatSidebar({ activeChatId }) {
             <MemoriesModal
                 open={memoriesModalOpen}
                 onClose={() => setMemoriesModalOpen(false)}
+            />
+
+            {/* Delete Artifact Modal */}
+            <DeleteArtifactModal
+                open={!!deleteArtifact}
+                onClose={() => setDeleteArtifact(null)}
+                artifact={deleteArtifact}
             />
         </div>
     );

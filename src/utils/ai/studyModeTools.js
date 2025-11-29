@@ -92,98 +92,108 @@ export const STUDY_MODE_TOOLS = {
         }),
     },
 
-    // Artifact tools
-    artifact_create: {
-        name: 'artifact_create',
+    // Artifact tools - separated by type for cleaner schemas and better LLM compliance
+    artifact_create_study_plan: {
+        name: 'artifact_create_study_plan',
         description:
-            'Create a rich, interactive study artifact. Use for structured content like lessons with embedded questions, study plans with checkable items, or flashcard sets. Artifacts appear in a side panel and can be revisited later.',
+            'Create a study plan artifact with checkable items. Use when student asks to "plan", "create a roadmap", or "organize my study". Study plans appear in a side panel with checkboxes.',
         parameters: z.object({
-            type: z
-                .enum(['study_plan', 'lesson', 'flashcards'])
-                .describe('Type of artifact to create'),
             title: z
                 .string()
-                .max(200)
-                .describe('Title of the artifact (e.g., "Chapter 3: Photosynthesis")'),
+                .describe('Title of the study plan (e.g., "Chapter 3 Study Plan")'),
             description: z
                 .string()
-                .max(500)
                 .optional()
-                .describe('Brief description of what this artifact covers'),
-            content: z
-                .object({
-                    // For study_plan
-                    items: z
-                        .array(
-                            z.object({
-                                id: z.string().describe('Unique ID for this item'),
-                                text: z.string().describe('The plan item text'),
-                                children: z
+                .describe('Brief description of what this plan covers'),
+            items: z
+                .array(
+                    z.object({
+                        id: z.string().describe('Unique ID for this item (e.g., "item-1")'),
+                        text: z.string().describe('The plan item text'),
+                        children: z
+                            .array(
+                                z.object({
+                                    id: z.string().describe('Unique ID for sub-item'),
+                                    text: z.string().describe('Sub-item text'),
+                                })
+                            )
+                            .optional()
+                            .describe('Optional nested sub-items'),
+                    })
+                )
+                .describe('Array of checkable study plan items'),
+        }),
+    },
+
+    artifact_create_lesson: {
+        name: 'artifact_create_lesson',
+        description:
+            'Create a lesson artifact with content sections and embedded quiz questions. Use for comprehensive explanations with practice problems. Lessons appear in a side panel.',
+        parameters: z.object({
+            title: z
+                .string()
+                .describe('Title of the lesson (e.g., "Introduction to Photosynthesis")'),
+            description: z
+                .string()
+                .optional()
+                .describe('Brief description of what this lesson covers'),
+            sections: z
+                .array(
+                    z.object({
+                        id: z.string().describe('Unique ID for this section (e.g., "section-1")'),
+                        type: z.enum(['content', 'question']).describe('Section type: "content" for text/markdown, "question" for a quiz question'),
+                        content: z
+                            .string()
+                            .optional()
+                            .describe('For type="content": the markdown text content'),
+                        question: z
+                            .object({
+                                type: z.enum(['multiple_choice', 'true_false', 'short_answer', 'long_answer', 'fill_blank'])
+                                    .describe('Question type: multiple_choice, true_false, short_answer (1-2 sentences), long_answer (detailed analysis/scenarios), fill_blank'),
+                                question: z.string().describe('The question text. For long_answer/scenarios, include the full scenario description here.'),
+                                options: z
                                     .array(
                                         z.object({
-                                            id: z.string(),
-                                            text: z.string(),
+                                            id: z.string().describe('Option ID (e.g., "a", "b", "c", "d")'),
+                                            text: z.string().describe('Option text'),
+                                            isCorrect: z.boolean().describe('Whether this is the correct answer'),
                                         })
                                     )
                                     .optional()
-                                    .describe('Optional nested sub-items'),
+                                    .describe('Required for multiple_choice (4 options) and true_false (2 options). Not used for other types.'),
+                                correctAnswer: z.string().describe('The correct answer or model solution. For long_answer, provide a detailed sample answer.'),
+                                explanation: z.string().describe('Explanation of the answer. For long_answer, explain the reasoning process.'),
+                                hint: z.string().optional().describe('Optional hint'),
                             })
-                        )
-                        .optional()
-                        .describe('For study_plan: array of checkable items'),
+                            .optional()
+                            .describe('For type="question": the quiz question details'),
+                    })
+                )
+                .describe('Array of lesson sections (content or questions)'),
+        }),
+    },
 
-                    // For lesson
-                    sections: z
-                        .array(
-                            z.object({
-                                id: z.string().describe('Unique ID for this section'),
-                                type: z.enum(['content', 'question']).describe('Section type'),
-                                content: z
-                                    .string()
-                                    .optional()
-                                    .describe('For content sections: markdown text'),
-                                question: z
-                                    .object({
-                                        type: z.enum([
-                                            'multiple_choice',
-                                            'true_false',
-                                            'short_answer',
-                                            'fill_blank',
-                                        ]),
-                                        question: z.string(),
-                                        options: z
-                                            .array(
-                                                z.object({
-                                                    id: z.string(),
-                                                    text: z.string(),
-                                                    isCorrect: z.boolean(),
-                                                })
-                                            )
-                                            .optional(),
-                                        correctAnswer: z.union([z.string(), z.array(z.string())]),
-                                        explanation: z.string(),
-                                        hint: z.string().optional(),
-                                    })
-                                    .optional()
-                                    .describe('For question sections: the quiz question'),
-                            })
-                        )
-                        .optional()
-                        .describe('For lesson: array of content and question sections'),
-
-                    // For flashcards
-                    cards: z
-                        .array(
-                            z.object({
-                                id: z.string().describe('Unique ID for this card'),
-                                front: z.string().describe('Front of the card (question/term)'),
-                                back: z.string().describe('Back of the card (answer/definition)'),
-                            })
-                        )
-                        .optional()
-                        .describe('For flashcards: array of front/back cards'),
-                })
-                .describe('Content of the artifact - structure depends on type'),
+    artifact_create_flashcards: {
+        name: 'artifact_create_flashcards',
+        description:
+            'Create a flashcard set for memorization. Use when student needs to memorize terms, definitions, vocabulary, or facts. Flashcards appear in a side panel with flip interaction.',
+        parameters: z.object({
+            title: z
+                .string()
+                .describe('Title of the flashcard set (e.g., "Biology Vocabulary")'),
+            description: z
+                .string()
+                .optional()
+                .describe('Brief description of what these flashcards cover'),
+            cards: z
+                .array(
+                    z.object({
+                        id: z.string().describe('Unique ID for this card (e.g., "card-1")'),
+                        front: z.string().describe('Front of the card (question/term)'),
+                        back: z.string().describe('Back of the card (answer/definition)'),
+                    })
+                )
+                .describe('Array of flashcards with front and back'),
         }),
     },
 
